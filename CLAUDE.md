@@ -30,13 +30,21 @@ en SQLite, aplica transformaciones SQL y escribe tablas de negocio en `output/`:
 - Los importes **no** vienen todos en euros: hay pedidos en USD y GBP. Se
   convierten a EUR con `data/reference/fx_rates.csv`.
 - Las consultas SQL están en `sql/`, no en `queries/`.
-- El historial de Git es parte de la entrega: commits frecuentes, sin reescribir
-  historia, y un tag `phase-N` al cerrar cada fase.
+## Reglas de Git
+
+- El historial debe reflejar el progreso real del desarrollo.
+- Realiza commits pequeños, reales y frecuentes durante cada fase.
+- Los commits realizados como agente conservan la línea `Co-Authored-By: Claude Code <noreply@anthropic.com>`.
+- Los mensajes de commit se escriben en español.
+- No reescribas el historial: no uses `amend`, no hagas `rebase` para modificar commits publicados ni `push --force`.
+- Solicita autorización antes de ejecutar commits y push.
+- Conserva los tags `phase-N` existentes y crea nuevos únicamente al cerrar cada fase.
+- No modifiques nunca `data/inbox/` ni `deliveries/`, salvo la incorporación de entregas mediante el procedimiento indicado en `assignment.md`.
 
 ## Cómo se sabe que un trabajo está terminado
 
-- `python tasks.py test` pasa (código de salida 0).
-- `python tasks.py check` pasa sobre `output/`.
+- `uv run python tasks.py test` pasa (código de salida 0).
+- `uv run python tasks.py check` pasa sobre `output/`.
 - El resultado cumple los contratos de datos en
   `docs/data-contracts/` (por ejemplo, `daily_sales.md`).
 - Se han documentado las decisiones y las pruebas en `docs/`.
