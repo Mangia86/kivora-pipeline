@@ -310,7 +310,7 @@ Documento en Markdown con, al menos, estas secciones:
 2. Añade al profesor como colaborador (*Settings → Collaborators*):
    [usuario de GitHub].
 3. Sube la rama `main` y los tags: `git push origin main --tags`.
-4. Comunica la URL del repositorio por [canal].
+4. Sube un archivo que contenga la URL del repositorio al apartado de entrega de la tarea en la plataforma del campus.
 
 **Sin cuenta de GitHub:** clona la plantilla en una carpeta llamada
 `kivora-pipeline`:
@@ -338,7 +338,7 @@ ejemplo, `sudo apt install zip`).
 
 Antes de enviarlo, compruébalo: descomprímelo en otra carpeta y ejecuta
 `git log --oneline` y `git tag` dentro. Tienen que aparecer tus commits y
-los seis tags. Envía el zip por [canal].
+los seis tags. Sube un archivo zip al apartado de entrega de la tarea en la plataforma del campus.
 
 Estructura mínima esperada al final:
 
