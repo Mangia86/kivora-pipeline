@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git ls-files *)",
+      "Bash(git rev-parse *)",
+      "Bash(git remote -v)",
+      "Bash(git branch --show-current)",
+      "Bash(git tag --list *)",
+      "Bash(git tag -l *)",
+      "Bash(git add *)",
+      "Bash(uv run python tasks.py test)",
+      "Bash(uv run python tasks.py check)",
+      "Bash(uv run python tasks.py run)",
+      "Bash(uv run python tasks.py setup)",
+      "Bash(uv run python -m pytest *)",
+      "Bash(uv run python -m kivora *)",
+      "PowerShell(git status *)",
+      "PowerShell(git diff *)",
+      "PowerShell(git log *)",
+      "PowerShell(git show *)",
+      "PowerShell(git ls-files *)",
+      "PowerShell(git rev-parse *)",
+      "PowerShell(git remote -v)",
+      "PowerShell(git branch --show-current)",
+      "PowerShell(git tag --list *)",
+      "PowerShell(git tag -l *)",
+      "PowerShell(git add *)",
+      "PowerShell(uv run python tasks.py test)",
+      "PowerShell(uv run python tasks.py check)",
+      "PowerShell(uv run python tasks.py run)",
+      "PowerShell(uv run python tasks.py setup)",
+      "PowerShell(uv run python -m pytest *)",
+      "PowerShell(uv run python -m kivora *)"
+    ],
+    "ask": [
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git tag -a *)",
+      "Bash(git tag phase-*)",
+      "Bash(uv run python tasks.py deliver *)",
+      "PowerShell(git commit *)",
+      "PowerShell(git push *)",
+      "PowerShell(git tag -a *)",
+      "PowerShell(git tag phase-*)",
+      "PowerShell(uv run python tasks.py deliver *)",
+      "Edit(/.claude/**)",
+      "Edit(/CLAUDE.md)"
+    ],
+    "deny": [
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git push --force-with-lease *)",
+      "Bash(git push upstream *)",
+      "Bash(git commit --amend *)",
+      "Bash(git rebase *)",
+      "Bash(git reset --hard *)",
+      "Bash(git tag -d *)",
+      "Bash(git tag -f *)",
+      "PowerShell(git push --force *)",
+      "PowerShell(git push -f *)",
+      "PowerShell(git push --force-with-lease *)",
+      "PowerShell(git push upstream *)",
+      "PowerShell(git commit --amend *)",
+      "PowerShell(git rebase *)",
+      "PowerShell(git reset --hard *)",
+      "PowerShell(git tag -d *)",
+      "PowerShell(git tag -f *)",
+      "Edit(/data/inbox/**)",
+      "Edit(/deliveries/**)",
+      "Edit(/.env*)",
+      "Read(/.env)",
+      "Read(/.env.*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell|Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && { for p in .venv/bin/python .venv/Scripts/python.exe; do [ -x \"$p\" ] && exec \"$p\" -I .claude/hooks/kivora_guard.py; done; exec uv run python -I .claude/hooks/kivora_guard.py; }",
+            "shell": "bash",
+            "timeout": 15,
+            "onFailure": "block"
+          }
+        ]
+      }
+    ]
+  }
+}
