@@ -4,14 +4,14 @@ import csv
 import sqlite3
 from pathlib import Path
 
-from kivora import ingest
+from kivora import ingest, metrics
 
 ROOT = Path(__file__).resolve().parent.parent
 SQL_DIR = ROOT / "sql"
 
 # Executed in this order. Each script creates the tables named after it.
-SCRIPTS = ["staging.sql", "daily_sales.sql", "top_customers.sql"]
-EXPORTS = ["daily_sales", "top_customers"]
+SCRIPTS = ["staging.sql", "daily_sales.sql", "top_customers.sql", "daily_customer_metrics.sql"]
+EXPORTS = ["daily_sales", "top_customers"]  # legacy outputs, exported straight from SQL
 
 
 def export_table(conn, table, path):
@@ -37,9 +37,13 @@ def run(inbox, reference, out):
             conn.executescript((SQL_DIR / script).read_text(encoding="utf-8"))
         for table in EXPORTS:
             export_table(conn, table, out / f"{table}.csv")
+        summary = metrics.run(conn, out)  # KIV-101: metrics, rejected and quality report
         orders = conn.execute("SELECT COUNT(*) FROM stg_orders").fetchone()[0]
     finally:
         conn.close()
     print(f"Días procesados: {len(days)} ({days[0]} .. {days[-1]})" if days else "Sin días.")
     print(f"Pedidos en staging: {orders}")
-    print(f"Salida en {out}/: " + ", ".join(f"{t}.csv" for t in EXPORTS))
+    print(f"Métricas cliente-día: {summary['rows']} | registros rechazados: {summary['rejected']}")
+    if summary["failed_checks"]:
+        print("Controles de calidad con anomalías: " + ", ".join(summary["failed_checks"]))
+    print(f"Salida en {out}/: " + ", ".join([f"{t}.csv" for t in EXPORTS] + metrics.OUTPUTS))
