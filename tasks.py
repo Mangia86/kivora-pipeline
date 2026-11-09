@@ -54,6 +54,11 @@ def check(_):
     return _module("kivora.check")
 
 
+def acceptance(_):
+    """Acceptance of KIV-101: scenarios E-1..E-15 over data/inbox (exit code 0 only if all pass)."""
+    return _module("kivora.acceptance")
+
+
 def reset(_):
     """Delete output/."""
     target = ROOT / "output"
@@ -99,6 +104,7 @@ TASKS = {
     "run": run,
     "test": test,
     "check": check,
+    "acceptance": acceptance,
     "reset": reset,
     "deliver": deliver,
 }
