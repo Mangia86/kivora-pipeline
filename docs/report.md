@@ -20,7 +20,8 @@
 | `a77d5f4` | Fase 4: `daily_customer_metrics`, `rejected.csv` y `quality_report.json` (ingest, staging, SQL y `kivora/metrics.py`) |
 | `d1a0b6e` | Fase 4: 16 tests de KIV-101 |
 | `2b87363` | Fase 4: tarea `acceptance` y ampliación de `check` |
-| *(commit de documentación, ver `git log`)* | Fase 4: respuesta a Finanzas en `docs/tickets/KIV-101.md` y esta memoria (v0.5) |
+| `b5aa5d2` | Fase 4: respuesta a Finanzas en `docs/tickets/KIV-101.md` y esta memoria (v0.5) |
+| *(commit de corrección documental, ver `git log`)* | Fase 4: RF-23 aprobado por el usuario en `spec.md`, `plan.md` y esta memoria |
 
 Los tags `phase-1`, `phase-2` y `phase-3` existen; `phase-4` **todavía no está creado**.
 
@@ -103,7 +104,7 @@ Para eliminar contradicciones con A-9 se ajustó también `spec.md` §5.2: la li
 | 2 | Última versión disponible de cada cliente; país vacío → `UNKNOWN` sin rellenar con versiones anteriores | Claude propuso; decisión del usuario | `spec.md` RF-22, A-11, E-15; `plan.md` paso 2b |
 | 3 | Control C-6 (conciliación de ventas) y ampliación de `check.py` | Claude propuso; decisión del usuario | `spec.md` C-6; `plan.md` pasos 8 y 11 |
 | 4 | Primero un commit solo de documentación (`spec.md` y `plan.md`) y después el código | Decisión del usuario | Commit `642e773`, anterior a todo el código |
-| 5 | Defensa ante datos defectuosos (RF-23): devolución sobre un pedido sin pago cobrado, importes o fechas ilegibles se rechazan con motivo explícito | **Claude, sin aprobación explícita**: cierra un caso que señaló el revisor independiente (hallazgos 8 y 15) y evita que el pipeline falle con datos desconocidos | `spec.md` RF-23 y §5.2 (siete motivos); `plan.md` paso 6. **Pendiente de confirmación del usuario** |
+| 5 | Defensa ante datos defectuosos (RF-23): devolución sobre un pedido sin pago cobrado, importes o fechas ilegibles se rechazan con motivo explícito | Propuesta de Claude, a partir de un caso que señaló el revisor independiente (hallazgos 8 y 15): evita que el pipeline falle con datos desconocidos. **Aprobada por el usuario**, que confirmó mantenerla en la especificación y en la implementación | `spec.md` RF-23 y §5.2 (siete motivos); `plan.md` paso 6 |
 
 Decisiones de diseño derivadas: la fecha de Madrid y toda la aritmética monetaria se calculan en Python (`kivora/metrics.py`); SQL solo selecciona; `stg_orders` y `stg_customers` heredadas no se tocan; `acceptance` trabaja sobre las entregas hasta 2026-09-07 (copiadas a una carpeta temporal) para que las entregas posteriores no muevan las cifras esperadas.
 
@@ -271,6 +272,7 @@ Vueltas reales, en orden. Criterio de «terminado»: `tasks.py test`, `tasks.py 
 | 4 | Salida de los tests y mutaciones del código real | 16 tests con datos sintéticos | 20 passed (4 heredados + 16). Seis mutaciones (join con la tabla heredada, versión más antigua, UTC en vez de Madrid, `ROUND_HALF_EVEN`, sin exigir pago cobrado, duplicados de `refund_id` sin descartar) hacen fallar al menos un test cada una. Commit `d1a0b6e` |
 | 5 | Salida de `acceptance`, de `check` con una salida rota a propósito y de dos ejecuciones con la interfaz oficial | `kivora/acceptance.py`, ampliación de `kivora/check.py` y tarea en `tasks.py` | `acceptance` 28 de 28 a la primera (incluidas las cifras de E-14 calculadas a mano en la spec); `check` sale con 1 con un neto roto y con 0 al restaurar; los hashes SHA-256 de las tres salidas coinciden entre ejecuciones. Commit `2b87363` |
 | 6 | Respuesta a Finanzas en lenguaje de negocio | `docs/tickets/KIV-101.md` e informe | Cifras tomadas de la salida: 156 ventas, 18.490,74 € bruto, 1.310,19 € devuelto, 17.180,55 € neto |
+| 7 | El usuario aprobó RF-23 y pidió mantenerlo en la especificación y en la implementación | RF-23 queda como aprobado en `plan.md`, en el informe y en `spec.md` (que deja constancia de la aprobación) | Corrección documental; no cambia el código ni los resultados |
 
 Nota honesta: los 16 tests y las 28 comprobaciones de `acceptance` pasaron a la primera, sin ninguna vuelta de corrección de código. Por eso se añadió la comprobación por mutación (vuelta 4): un test que pasa a la primera solo es fiable si se demuestra que falla cuando la regla se rompe.
 

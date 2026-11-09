@@ -395,7 +395,7 @@ Cambios sobre la revisión 1 (commit `b7513de`), a raíz de cinco incidencias de
 
 ## 10. Revisión 3 (fase 4, antes de escribir código)
 
-Cuatro decisiones del usuario, más un caso que detectó el revisor independiente (`kivora-reviewer`) y la implementación necesita cerrar.
+Cuatro decisiones del usuario, más un caso que detectó el revisor independiente (`kivora-reviewer`), que la implementación necesitaba cerrar y que el usuario aprobó después (RF-23).
 
 | # | Cuestión | Decisión | Cambio en este plan | Justificación |
 |---|---|---|---|---|
@@ -403,7 +403,7 @@ Cuatro decisiones del usuario, más un caso que detectó el revisor independient
 | 2 | Versiones de cliente (`C005` llega tres veces; `stg_customers` conserva dos filas) | Última versión disponible; país vacío → `UNKNOWN` (RF-22, A-11) | Paso 2b nuevo (`stg_customers_latest`), Paso 5, test 16, E-15 | Determinista y sin duplicados; no se inventan datos |
 | 3 | Control de conciliación y validación de salidas | Control C-6 y ampliación de `kivora/check.py` | Pasos 8 y 11, sección 5 | C-6 es el que detecta duplicados por join; `check` debe cubrir las salidas nuevas |
 | 4 | Orden del historial | Primero un commit solo de documentación (`spec.md` y `plan.md`) y después el código | Sección 7 | El enunciado puntúa «nada de código antes de especificar» y «plan revisado antes de implementar» |
-| 5 | Datos defectuosos no previstos (hallazgos 8 y 15 del revisor): devolución sobre un pedido existente sin pago cobrado, importes o fechas inválidos | Rechazar con motivo explícito en lugar de fallar o descartar en silencio (RF-23) | Paso 6 (siete motivos), test 17 | El ticket pide no tirar registros sin más; el pipeline debe funcionar con datos desconocidos. **Pendiente de confirmación del usuario** |
+| 5 | Datos defectuosos no previstos (hallazgos 8 y 15 del revisor): devolución sobre un pedido existente sin pago cobrado, importes o fechas inválidos | Rechazar con motivo explícito en lugar de fallar o descartar en silencio (RF-23) | Paso 6 (siete motivos), test 17 | El ticket pide no tirar registros sin más; el pipeline debe funcionar con datos desconocidos. **Aprobada por el usuario** en la fase 4 (se mantiene en la especificación y en la implementación) |
 
 **Cambios de diseño que se desprenden de lo anterior:**
 
