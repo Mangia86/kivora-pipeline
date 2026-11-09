@@ -57,7 +57,7 @@ Los siguientes elementos no forman parte de KIV-101 y se dejan para fases poster
 | ID | Requisito |
 |----|-----------|
 | RF-1 | Generar `output/daily_customer_metrics.csv` con, como mínimo, las columnas `metric_date`, `customer_id`, `country`, `orders_count`, `gross_amount`, `refunded_amount`, `net_amount`, `refunds_count`, `last_purchase_date`. Una fila por cliente-día con actividad de compra válida. |
-| RF-2 | Generar `output/rejected.csv` con, como mínimo, las columnas `source`, `record_id`, `reason`. Una fila por cada pedido o devolución que no se haya podido usar, con el motivo explícito. |
+| RF-2 | Generar `output/rejected.csv` con, como mínimo, las columnas `source`, `record_id`, `reason`. Una fila por cada devolución o pedido que no se haya podido procesar por un problema del dato (los cuatro motivos de §5.2), con el motivo explícito. Un pedido cancelado o sin pago `captured` es un estado de negocio válido: no cuenta como venta, pero **no** se rechaza por ese solo motivo (A-9). |
 | RF-3 | Generar `output/quality_report.json` con la estructura `{"checks": [{"name": "...", "passed": true, "failed_records": 0}, ...]}` y al menos dos controles de calidad. |
 | RF-4 | Todos los importes de salida en EUR, con punto decimal y dos decimales. |
 | RF-5 | La conversión a EUR usa `data/reference/fx_rates.csv` (`importe_eur = importe × rate_to_eur`). Las monedas no listadas en esa tabla no se convierten: el registro se rechaza e informa. |
@@ -71,7 +71,7 @@ Los siguientes elementos no forman parte de KIV-101 y se dejan para fases poster
 | RF-13 | Las devoluciones sobre pedidos cancelados se rechazan y se informan en `rejected.csv` con motivo explícito (el pedido cancelado no es una venta válida). |
 | RF-14 | Las devoluciones parciales y varias devoluciones sobre un mismo pedido se acumulan correctamente en `refunded_amount` y `refunds_count`. |
 | RF-15 | Los clientes sin país informado (`country` vacío) se muestran con `country = UNKNOWN`. No se pierden ventas por falta de país. |
-| RF-16 | `last_purchase_date` es la fecha de la última compra válida de ese cliente hasta `metric_date` inclusive. Si el cliente compró en `metric_date`, `last_purchase_date = metric_date`. |
+| RF-16 | `last_purchase_date` es la fecha de la última compra válida de ese cliente hasta `metric_date` inclusive. Como el grano es una fila por cliente y día **con compra válida** (RF-1) y no se emiten filas de días sin compras, el cliente siempre compró en `metric_date` y, por tanto, `last_purchase_date = metric_date` en todas las filas. La columna se mantiene por el contrato del ticket. |
 | RF-17 | El importe neto se calcula como `gross_amount - refunded_amount` por fila cliente-día. Si las devoluciones superan el importe bruto, el neto puede ser negativo: se refleja el dato real y se señala mediante un control de calidad, sin ocultar el registro. |
 | RF-18 | El pipeline es determinista: dos ejecuciones sobre los mismos datos de entrada producen ficheros de salida idénticos (byte a byte). |
 | RF-19 | El pipeline nunca escribe en la carpeta de entrada (`--inbox`) ni en `deliveries/`. |
@@ -84,7 +84,7 @@ Los siguientes elementos no forman parte de KIV-101 y se dejan para fases poster
 | ID | Requisito |
 |----|-----------|
 | RNF-1 | Determinismo de salida (mismo orden de filas, mismos valores, mismos redondeos). |
-| RNF-2 | Precisión monetaria: uso de `Decimal` para conversiones y redondeo a dos decimales con modo `ROUND_HALF_UP`. No usar `float` para importes. |
+| RNF-2 | Precisión monetaria: **todos** los cálculos monetarios (conversión a EUR, sumas, restas, comparaciones de los controles y redondeo a dos decimales con `ROUND_HALF_UP`) se hacen en Python con `decimal.Decimal`. No se usa `float` ni `REAL` de SQLite para importes. `CAST ... AS NUMERIC` de SQLite no se considera equivalente a `Decimal` y no se usa para aritmética monetaria; SQL solo selecciona, deduplica y une registros, y los importes viajan como texto hasta Python. |
 | RNF-3 | Aplicable a datos futuros desconocidos: las reglas no deben depender de identificadores, fechas o valores concretos de las entregas actuales. |
 | RNF-4 | Trazabilidad: todo registro descartado debe aparecer en `rejected.csv` con su `source`, `record_id` y `reason`. |
 | RNF-5 | No modificar `data/inbox/` ni `deliveries/`. |
@@ -106,7 +106,7 @@ Los siguientes elementos no forman parte de KIV-101 y se dejan para fases poster
 | `refunded_amount` | decimal | Importe total devuelto en EUR, dos decimales. |
 | `net_amount` | decimal | `gross_amount - refunded_amount`, dos decimales. Puede ser negativo. |
 | `refunds_count` | entero | Número de devoluciones computadas para ese cliente-día. |
-| `last_purchase_date` | fecha `AAAA-MM-DD` | Fecha de la última compra válida del cliente hasta `metric_date` inclusive. |
+| `last_purchase_date` | fecha `AAAA-MM-DD` | Fecha de la última compra válida del cliente hasta `metric_date` inclusive. Con el grano actual (solo días con compra) coincide con `metric_date` en todas las filas (RF-16). |
 
 **Grano:** una fila por cliente-día con al menos un pedido válido. No hay filas para días sin compras, aunque haya devoluciones atribuidas a ese día (las devoluciones sin compra asociada en ese cliente-día se suman al `refunded_amount` de la fila existente; si no existe fila de compra, la devolución se rechaza en `rejected.csv`).
 
@@ -118,9 +118,11 @@ Los siguientes elementos no forman parte de KIV-101 y se dejan para fases poster
 
 | Columna | Tipo | Descripción |
 |---------|------|-------------|
-| `source` | texto | Origen del registro: `orders`, `payments`, `refunds` o `customers`. |
-| `record_id` | texto | Identificador del registro rechazado (`order_id`, `refund_id`, `payment_id` o `customer_id`). |
-| `reason` | texto | Motivo legible del rechazo (ejemplos: `pedido no encontrado`, `pedido cancelado`, `moneda no soportada`, `refund_id duplicado`, `cliente no encontrado`). |
+| `source` | texto | Origen del registro rechazado: `refunds` (devolución) u `orders` (pedido con moneda no soportada). |
+| `record_id` | texto | Identificador del registro rechazado (`refund_id` u `order_id`). |
+| `reason` | texto | Motivo del rechazo; cerrado a cuatro valores: `pedido no encontrado` y `pedido cancelado` (devoluciones cuyo pedido no existe o está cancelado), `refund_id duplicado` (segunda y sucesivas ocurrencias) y `moneda no soportada`. |
+
+Un pedido cancelado o sin pago `captured` no genera fila por sí mismo (A-9). Un cliente sin país o inexistente tampoco: su venta se conserva con `country = UNKNOWN` (RF-15).
 
 **Grano:** una fila por registro rechazado.
 
@@ -178,14 +180,14 @@ Se requiere al menos dos controles (ver sección 8).
 ### 6.4 Monedas y conversión
 
 - Todos los importes (pedidos y devoluciones) se convierten a EUR con `data/reference/fx_rates.csv`: `importe_eur = importe × rate_to_eur`.
-- Se usa `Decimal` para la conversión y el redondeo a dos decimales con `ROUND_HALF_UP`.
+- Se usa `Decimal` en Python para la conversión, las sumas y el redondeo a dos decimales con `ROUND_HALF_UP` (RNF-2).
 - Si una moneda no aparece en `fx_rates.csv`, el registro se rechaza e informa en `rejected.csv` (`moneda no soportada`).
 
 ### 6.5 Datos incompletos
 
 - Cliente sin país (`country` vacío): `country = UNKNOWN` en la salida. La venta no se rechaza por falta de país.
 - Cliente no encontrado en `customers.csv` para un pedido válido: el pedido se conserva con `country = UNKNOWN`.
-- Pedido sin pagos: no es venta válida, no aparece en métricas.
+- Pedido sin pagos `captured` o cancelado: no es venta válida y no aparece en métricas; tampoco se rechaza por ese solo motivo (A-9).
 
 ---
 
@@ -227,7 +229,7 @@ Todos los escenarios se verifican contra los datos reales de `data/inbox/` (día
 
 **Resultado esperado:**
 - `C022 / 2026-09-04`: `orders_count = 3`, `gross_amount = 325.17`, `refunded_amount = 126.02`, `net_amount = 199.15`, `refunds_count = 3`, `last_purchase_date = 2026-09-04`.
-- El neto es 199.15 (no se oculta que las devoluciones superen el importe de K-10148 individualmente; se señala por QC).
+- El neto del cliente-día es 199.15. Que las devoluciones de `K-10148` (101.20 EUR) superen el importe de ese pedido (92.00 EUR) no se oculta: lo señala el control C-3 (por pedido), no C-2 (por cliente-día, que aquí pasa).
 
 **Falla si:** `refunds_count` ≠ 3, o `refunded_amount` ≠ 126.02, o se cuenta una sola devolución.
 
@@ -268,8 +270,9 @@ Todos los escenarios se verifican contra los datos reales de `data/inbox/` (día
 **Resultado esperado:**
 - `C014` no tiene fila para `K-10149` en `daily_customer_metrics` el 2026-09-04 (el pedido cancelado no es venta).
 - `rejected.csv` contiene una fila con `source = refunds`, `record_id = R-1005`, `reason` que indique pedido cancelado.
+- `rejected.csv` **no** contiene ninguna fila con `source = orders` y `record_id = K-10149`: el pedido cancelado es un estado de negocio válido (A-9); solo se rechaza su devolución.
 
-**Falla si:** el pedido cancelado cuenta como venta, o `R-1005` no está en `rejected.csv`.
+**Falla si:** el pedido cancelado cuenta como venta, `R-1005` no está en `rejected.csv`, o `K-10149` aparece en `rejected.csv` como pedido.
 
 ### E-9 — Determinismo
 
@@ -291,13 +294,37 @@ Todos los escenarios se verifican contra los datos reales de `data/inbox/` (día
 
 ### E-11 — Refund_id duplicado
 
-**Contexto:** `R-1006` aparece dos veces (mismo `refund_id`, `order_id = K-10157`, 12.00 EUR) en los archivos `refunds.json` de 2026-09-04 y 2026-09-05.
+**Contexto:** `R-1006` aparece dos veces (mismo `refund_id`, `order_id = K-10157`, 12.00 EUR, mismo `refunded_at = 2026-09-05T16:20:00Z`) en los archivos `refunds.json` de **2026-09-05 y 2026-09-06**. El pedido `K-10157` es del cliente `C028`, creado el 2026-09-04.
 
 **Resultado esperado:**
-- `C028 / 2026-09-04`: `refunded_amount = 12.00`, `refunds_count = 1` (no 24.00 ni 2).
-- La segunda ocurrencia de `R-1006` aparece en `rejected.csv` como duplicado.
+- `C028 / 2026-09-04`: `gross_amount = 196.69`, `refunded_amount = 12.00`, `refunds_count = 1` (no 24.00 ni 2).
+- La segunda ocurrencia de `R-1006` (la del fichero 2026-09-06, en orden cronológico de ficheros) aparece en `rejected.csv` como duplicado.
 
 **Falla si:** se suman ambas ocurrencias, o el duplicado no se informa en `rejected.csv`.
+
+### E-12 — Última versión de un pedido por `updated_at` y empate determinista (RF-7)
+
+**Contexto (cambio de importe):** `K-10151` (cliente `C010`, creado el 2026-09-04T07:13:45Z) llega dos veces: en `2026-09-04/orders.csv` con `updated_at = 2026-09-04T07:13:45Z` y `total_amount = 64.00` EUR, y en `2026-09-05/orders.csv` con `updated_at = 2026-09-05T09:12:00Z` y `total_amount = 58.50` EUR. Su único pago es `P-30161` (`captured`, 64.00). El mismo día `C010` compró `K-10076` (199.82 EUR), con la devolución `R-1023` (99.91 EUR).
+
+**Contexto (empate):** `K-10060` (cliente `C021`, 67.25 GBP, creado el 2026-09-02T10:43:52Z) llega en `2026-09-02/orders.csv` y en `2026-09-03/orders.csv` con filas idénticas (mismo `updated_at = 2026-09-02T10:43:52Z`). Su devolución es `R-1017` (33.62 GBP).
+
+**Resultado esperado:**
+- `C010 / 2026-09-04`: `orders_count = 2`, `gross_amount = 258.32` (199.82 + **58.50**, no 64.00 ni la suma de las dos versiones), `refunded_amount = 99.91`, `net_amount = 158.41`, `refunds_count = 1`. Se usa `total_amount` de la última versión (58.50), no el importe del pago (64.00).
+- `C010 / 2026-09-05`: `orders_count = 1`, `gross_amount = 41.55` (solo `K-10104`): la actualización del 2026-09-05 no crea ni altera una fila de ese día, porque el pedido se atribuye a su `created_at`.
+- `C021 / 2026-09-02`: `orders_count = 1`, `gross_amount = 78.68` (67.25 GBP × 1.17), `refunded_amount = 39.34` (33.62 GBP × 1.17), `net_amount = 39.34`, `refunds_count = 1`. `C021` no tiene fila el 2026-09-03: la aparición repetida de `K-10060` ese día no genera una venta.
+
+**Falla si:** `C010 / 2026-09-04` usa 64.00 o suma ambas versiones, aparece `K-10151` el 2026-09-05, o `K-10060` cuenta dos veces.
+
+### E-13 — Pedido confirmado sin pago cobrado no es venta (RF-8)
+
+**Contexto:** `K-10062` (cliente `C024`, creado el 2026-09-02T19:31:03Z, `status = confirmed`, 99.00 EUR) tiene dos pagos, `P-30066` y `P-30067`, ambos `failed` (99.00). No tiene ningún pago `captured`. `C024` tiene ese día otro pedido válido: `K-10020` (197.51 EUR).
+
+**Resultado esperado:**
+- `C024 / 2026-09-02`: `orders_count = 1`, `gross_amount = 197.51`, `refunded_amount = 0.00`, `net_amount = 197.51`, `refunds_count = 0` (`K-10062` no cuenta).
+- Con los datos actuales, `K-10062` y `K-10149` (E-8) son los dos únicos pedidos únicos que no son venta (158 pedidos únicos, 156 ventas).
+- `rejected.csv` **no** contiene ninguna fila con `source = orders` y `record_id = K-10062`: un pedido sin pago cobrado es un estado de negocio válido que no cuenta como venta (A-9).
+
+**Falla si:** `C024 / 2026-09-02` muestra `orders_count = 2` o `gross_amount = 296.51`, o `K-10062` aparece en `rejected.csv`.
 
 ---
 
@@ -308,12 +335,14 @@ Se incluyen los siguientes controles verificables. Cada uno tiene `name`, `passe
 | # | Nombre | Qué comprueba | Registros que fallarían con datos actuales |
 |---|--------|---------------|--------------------------------------------|
 | C-1 | `net_amount_equals_gross_minus_refunded` | En cada fila de `daily_customer_metrics`, `net_amount = gross_amount - refunded_amount` | Ninguno (si el cálculo es correcto) |
-| C-2 | `net_amount_not_negative_anomaly` | `net_amount >= 0`. Señala devoluciones que superan el importe comprado del cliente-día. | `C022 / 2026-09-04` (net = -9.20 EUR: compró 92.00 EUR en K-10148 y se devolvieron 101.20 EUR entre R-1004 y R-1009) |
-| C-3 | `refunded_not_exceeds_gross_per_order` | Para cada pedido, la suma de sus devoluciones convertidas no supera el importe bruto del pedido | `K-10148` (devoluciones 101.20 EUR > pedido 92.00 EUR) |
-| C-4 | `no_duplicate_refund_ids` | Cada `refund_id` aparece una sola vez tras la deduplicación | `R-1006` (detectado como duplicado y eliminado del cálculo) |
+| C-2 | `net_amount_not_negative_anomaly` | `net_amount >= 0` **por fila cliente-día**. Señala los cliente-día en los que lo devuelto supera lo comprado ese día. | **Ninguno** (verificado: 118 filas cliente-día, ninguna con `net_amount < 0`). El control se mantiene para detectar casos futuros |
+| C-3 | `refunded_not_exceeds_gross_per_order` | Para cada pedido, la suma de sus devoluciones convertidas no supera el importe bruto del pedido | `K-10148` (devoluciones 101.20 EUR > pedido 92.00 EUR). Es el único pedido en esa situación con los datos actuales |
+| C-4 | `no_duplicate_refund_ids` | Cada `refund_id` aparece una sola vez en las devoluciones que se computan, tras la deduplicación | Ninguno (`R-1006` se deduplica antes del cálculo y se informa en `rejected.csv`) |
 | C-5 | `all_rejected_records_have_reason` | Cada fila de `rejected.csv` tiene un `reason` no vacío | Ninguno (si `rejected.csv` se genera correctamente) |
 
 **Nota:** C-2 y C-3 pueden fallar con datos válidos del negocio (anomalías de origen). Eso no es un error del pipeline: es la señal que Finanzas pidió explícitamente ("quiero saber cuáles son y por qué"). El pipeline termina con código 0 aunque estos controles fallen; el fallo se reporta en `quality_report.json`.
+
+**Niveles de comprobación.** C-2 se evalúa por cliente-día y C-3 por pedido: son distintos. Con los datos actuales `K-10148` incumple C-3 pero no C-2, porque `C022 / 2026-09-04` compró además `K-10070` y `K-10079` y su neto agregado es 199.15 (E-4). Con los datos actuales, por tanto, solo C-3 reporta `failed_records > 0` (1 registro); C-2 pasa con 0.
 
 ---
 
@@ -349,7 +378,7 @@ Se incluyen los siguientes controles verificables. Cada uno tiene `name`, `passe
 
 - Cliente sin país → `UNKNOWN`.
 - Cliente no encontrado → `UNKNOWN`.
-- Pedido sin pago `captured` → no es venta válida.
+- Pedido sin pago `captured` → no es venta válida (no se rechaza por ese solo motivo, A-9).
 
 ---
 
@@ -427,7 +456,9 @@ Cada ambigüedad detectada en el ticket y en los datos, con las opciones conside
 
 **Decisión adoptada:** (b).
 
-**Justificación:** (a) haría la columna redundante. (b) aporta información real acumulativa que Finanzas puede usar ("cuándo compró por última vez este cliente al cierre de ese día").
+**Justificación:** (b) es la definición correcta de «última compra» y no depende de que cambie el grano: si en el futuro se emitieran filas de días sin compras, `last_purchase_date` ya tendría el significado acumulativo esperado.
+
+**Consecuencia reconocida:** con el grano vigente (una fila por cliente y día con compra válida; no se añaden filas de días sin compras), el cliente siempre compró en `metric_date`, por lo que `last_purchase_date` **coincide con `metric_date` en todas las filas**. La decisión no aporta información distinta de `metric_date` bajo este alcance; se mantiene porque el ticket pide la columna y para no cambiar su definición si el grano se ampliara.
 
 ### A-8 — ¿Se convierten las devoluciones a EUR con `fx_rates.csv`?
 
@@ -438,6 +469,18 @@ Cada ambigüedad detectada en el ticket y en los datos, con las opciones conside
 **Decisión adoptada:** (a).
 
 **Justificación:** Coherencia con el tratamiento de importes de pedidos. Si la moneda no está en la tabla, se rechaza (RF-5).
+
+### A-9 — ¿Un pedido que no es venta (cancelado o sin pago cobrado) debe aparecer en `rejected.csv`?
+
+**Contexto:** el ticket pide en `rejected.csv` «un registro por cada pedido o devolución que no se ha podido usar». Con los datos actuales hay dos pedidos que no son venta: `K-10149` (cancelado) y `K-10062` (sin pago `captured`).
+
+**Alternativas:**
+- (a) No se rechazan: cancelado o impagado es un estado de negocio legítimo, no un defecto del dato; simplemente no cuentan como venta.
+- (b) Se rechazan con motivo explícito (`pedido cancelado`, `sin pago cobrado`), de modo que `rejected.csv` explique también por qué faltan pedidos en las métricas.
+
+**Decisión adoptada:** (a). Los pedidos cancelados o sin pago `captured` no aparecen en `rejected.csv` por ese solo motivo. Las devoluciones que no puedan procesarse (pedido inexistente, pedido cancelado, `refund_id` duplicado, moneda no soportada) siguen registrándose como rechazadas.
+
+**Justificación:** son estados de negocio válidos, aunque no cuenten como ventas (RF-8); rechazarlos mezclaría pedidos legítimos con registros con un problema de datos. Coherente con el contrato de `daily_sales`. `rejected.csv` queda reservado a lo que no se pudo procesar.
 
 ---
 
