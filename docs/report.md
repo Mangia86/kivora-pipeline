@@ -13,7 +13,8 @@
 | `5b25630` | `docs/specs/KIV-101/plan.md`, borrador inicial tal como lo generó Claude |
 | `b7513de` | `plan.md` revisado, con la sección «Revisión del plan» |
 | `efe0bcc` | `docs/report.md`, versión 0.1 |
-| *(commit de cierre, ver `git log`)* | `Fase 2: cerrar especificacion, plan y memoria de KIV-101`: corrección de las cinco incidencias y resolución de A-9 en `spec.md`, `plan.md` y `report.md` |
+| `f37e4ee` | `Fase 2: cerrar especificacion, plan y memoria de KIV-101`: corrección de las cinco incidencias y resolución de A-9 en `spec.md`, `plan.md` y `report.md` |
+| *(commit de evidencia, ver `git log`)* | `Fase 2: incorporar evidencia de Claude Code`: `docs/sessions/fase-2-sesion-claude.md` y nota en esta memoria |
 
 El tag `phase-1` existe; `phase-2` **todavía no está creado**.
 
@@ -121,6 +122,15 @@ Vueltas reales de la fase 2, en orden. El recuento y el criterio de «terminado�
 | 15 | Resolución de los tres puntos abiertos | El usuario decidió cada uno (sección 1.4) y autorizó el commit | Se actualizaron los tres documentos, se eliminó la contradicción de `spec.md` §5.2 con RF-15 y se commiteó con el mensaje indicado por el usuario |
 
 Nota verificable: tras los errores de las vueltas 4 y 7, el contexto posterior (`/context`) indica que la sesión pasó a usar el modelo `claude-sonnet-5-5`; antes, el modelo indicado era `nvidia/nemotron-3.5-super-vl:free`.
+
+### Evidencia de sesión de la fase 2
+
+- **Cómo se obtuvo:** con `/export docs/sessions/fase-2-sesion-claude.md` de Claude Code, sin editar el resultado (288.930 bytes, 4.874 líneas, SHA-256 `278E5C99CED6C0F0C70AA1D082E83BE7046FBB37C99A3FFC202A8255BD528E84`).
+- **Qué cubre:** mensajes anteriores y posteriores al cambio de modelo de NVIDIA Nemotron a Claude Sonnet: el primer prompt de la sesión, los errores de la primera etapa, la retoma tras el 429 y el propio `/export`. El archivo no etiqueta el modelo de cada mensaje; solo su cabecera indica el modelo inicial. Los mensajes escritos por el usuario aparecen en él.
+- **Límites:** no es una transcripción completa sin recortes. El terminal recorta automáticamente algunas salidas de herramientas (89 marcadores `… +N lines`, que ocultan 1.861 líneas), varios errores figuran con la redacción del terminal y no con el texto original de la herramienta, y el mensaje de vuelta del subagente no aparece.
+- **Copia íntegra:** existe una copia de la transcripción JSONL de la sesión fuera del repositorio (`~/kivora-backups/`, SHA-256 `4DB513A0D31BD500650D086044EB3794FF1A3E62D21F7BC9D1345464693EB2D4`). **No se publica**: contiene metadatos internos, rutas y datos de las peticiones.
+- **Privacidad:** una búsqueda por patrones (no una lectura línea a línea) no encontró credenciales ni claves. El export contiene rutas locales, el usuario de GitHub y nombres del material del curso, aceptados por el usuario.
+- **Alcance temporal:** el export termina antes del commit de esta evidencia y del tag `phase-2`.
 
 ---
 
