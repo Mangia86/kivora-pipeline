@@ -1,7 +1,7 @@
-# Plan de implementación KIV-101 · Revisión 2
+# Plan de implementación KIV-101 · Revisión 3
 
-**Base:** `docs/specs/KIV-101/spec.md` y `assignment.md` (fase 2).
-**Estado:** revisión 1 (commit b7513de) sobre el borrador inicial (commit 5b25630), más la revisión 2 de cierre de fase (sección 9): precisión monetaria solo con `Decimal` en Python, escenarios E-12 y E-13, y corrección de los controles C-2/C-3.
+**Base:** `docs/specs/KIV-101/spec.md` y `assignment.md`.
+**Estado:** revisión 1 (commit b7513de) sobre el borrador inicial (commit 5b25630); revisión 2 de cierre de la fase 2 (sección 9); **revisión 3 de la fase 4 (sección 10)**, previa a escribir código: `metric_date` en `Europe/Madrid` (RF-21), última versión de cliente (RF-22), defensa ante datos defectuosos (RF-23), escenarios E-14 y E-15, control C-6, tarea `acceptance` y ampliación de `check.py`.
 
 **Decisión transversal de precisión monetaria.** Todo cálculo monetario (conversión a EUR, sumas, restas, comparaciones de los controles y redondeo `ROUND_HALF_UP` a dos decimales) se hace en Python con `decimal.Decimal` (RNF-2 de `spec.md`). SQL solo selecciona, deduplica y une registros; los importes se guardan y se leen como texto. `CAST ... AS NUMERIC` de SQLite **no** se considera equivalente a `Decimal` y no se usa para aritmética monetaria.
 
@@ -43,6 +43,17 @@ La tabla heredada `stg_orders` (que convierte a `REAL` y alimenta `daily_sales` 
 
 ---
 
+### Paso 2b · Staging de clientes: última versión (RF-22, A-11)
+
+**Tarea:** Añadir a `sql/staging.sql` la tabla `stg_customers_latest`, con una sola fila por `customer_id`: la de la carpeta de día más reciente y, dentro del día, la última fila cargada (`ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY _day DESC, rowid DESC)`). La tabla heredada `stg_customers` (con `DISTINCT`, que conserva dos filas de `C005`) **no se modifica**: la usa `daily_sales`. Si el país de la última versión está vacío, el país de salida es `UNKNOWN` (sin rellenar con versiones anteriores).
+
+**Archivos afectados:**
+- `sql/staging.sql`: bloque nuevo `stg_customers_latest`.
+
+**Verificación:** una fila por cliente; `C005` conserva `Marcos Vidal Ruiz` (2026-09-05) y un join con esta tabla no multiplica pedidos (E-15, control C-6).
+
+---
+
 ### Paso 3 · Staging de pagos: validación sin multiplicación de importes
 
 **Tarea:** Mantener `stg_payments` tal como está (columnas como texto, incluido `amount`). Los pagos se usan únicamente para validar que un pedido tiene al menos un pago `captured`; nunca se suman ni se multiplican para calcular el importe bruto de una venta.
@@ -70,17 +81,20 @@ La tabla heredada `stg_orders` (que convierte a `REAL` y alimenta `daily_sales` 
 **Tarea:** Dividir el trabajo entre SQL (selección) y Python (aritmética monetaria con `Decimal`):
 
 - `sql/daily_customer_metrics.sql` (nuevo) **solo selecciona y une, sin aritmética**, y deja dos tablas con importes en texto:
-  - ventas válidas: una fila por `order_id` de `stg_orders_latest` con `status <> 'cancelled'` y `EXISTS` un pago `captured` en `stg_payments` (sin `JOIN` que multiplique filas), con `customer_id`, `metric_date` (día de `created_at`), `currency`, `total_amount` (texto) y el país del cliente (`UNKNOWN` si falta o si el cliente no existe);
-  - devoluciones imputables: una fila por `refund_id` de `stg_refunds` cuyo pedido existe y es una venta válida, con el `metric_date` y el `customer_id` de su pedido, `currency` y `amount` (texto).
+  - ventas válidas: una fila por `order_id` de `stg_orders_latest` con `status <> 'cancelled'` y `EXISTS` un pago `captured` en `stg_payments` (sin `JOIN` que multiplique filas), con `customer_id`, `created_at` (texto UTC; la fecha se calcula en Python), `currency`, `total_amount` (texto) y el país de `stg_customers_latest` (`UNKNOWN` si falta o está vacío);
+  - devoluciones imputables: una fila por `refund_id` de `stg_refunds` cuyo pedido existe y es una venta válida, con el `created_at` y el `customer_id` de su pedido, `currency` y `amount` (texto);
+  - rechazos de origen SQL (`kpi_rejected`): devoluciones sobre pedido inexistente, cancelado o sin pago cobrado, y duplicados de `refund_id`.
 - `kivora/metrics.py` (nuevo) calcula con `Decimal`, a partir de esas tablas y de `ref_fx_rates`: conversión a EUR con `ROUND_HALF_UP` a dos decimales, agregación por `(metric_date, customer_id)` de `orders_count`, `gross_amount`, `refunded_amount`, `refunds_count`, `net_amount = gross_amount - refunded_amount` y `last_purchase_date`, ordenación por `metric_date` y `customer_id`, y escritura de `daily_customer_metrics.csv` con importes de dos decimales.
-- Atribución de devoluciones al `created_at` del pedido (día de compra original).
+- **`metric_date` en `Europe/Madrid` (RF-21):** en `kivora/metrics.py`, con `zoneinfo.ZoneInfo("Europe/Madrid")` sobre `created_at` (UTC): SQLite no maneja zonas horarias, y el horario de verano lo resuelve la biblioteca. `tzdata` ya es dependencia del proyecto.
+- Atribución de devoluciones al `created_at` del pedido (día de compra original, en Madrid).
+- Importes ausentes o no numéricos y fechas no interpretables se rechazan sin romper el pipeline (RF-23).
 - `last_purchase_date` = máxima fecha de compra válida del cliente hasta `metric_date` inclusive. Con una fila por cliente-día con compra (sin filas de días sin compras), coincide con `metric_date` en todas las filas (RF-16).
 
 **Archivos afectados:**
 - `sql/daily_customer_metrics.sql` (nuevo).
 - `kivora/metrics.py` (nuevo).
 
-**Verificación:** `output/daily_customer_metrics.csv` tiene las 9 columnas exigidas y las filas de los escenarios E-1 a E-13 de `spec.md` se verifican con `tasks.py acceptance`. Ningún importe pasa por `float` ni por `REAL`/`NUMERIC` de SQLite.
+**Verificación:** `output/daily_customer_metrics.csv` tiene las 9 columnas exigidas y las filas de los escenarios E-1 a E-15 de `spec.md` se verifican con `tasks.py acceptance`. Ningún importe pasa por `float` ni por `REAL`/`NUMERIC` de SQLite.
 
 ---
 
@@ -90,15 +104,17 @@ La tabla heredada `stg_orders` (que convierte a `REAL` y alimenta `daily_sales` 
 
 - `refunds` con `order_id` inexistente en ningún `orders.csv` → `pedido no encontrado`.
 - `refunds` sobre pedido cuya última versión está `cancelled` → `pedido cancelado`.
+- `refunds` sobre un pedido que existe pero no es venta por falta de pago `captured` → `pedido sin pago cobrado` (RF-23).
 - `refund_id` duplicado (segunda y sucesivas ocurrencias) → `refund_id duplicado`.
 - Pedido o devolución con moneda no presente en `fx_rates.csv` → `moneda no soportada`.
+- Pedido o devolución con importe ausente o no numérico → `importe no valido`; pedido con `created_at` no interpretable → `fecha no valida` (RF-23).
 
 Los rechazados se conservan en `rejected.csv` para trazabilidad; no se descartan silenciosamente.
 
-**Decidido (A-9 de `spec.md`):** los pedidos cancelados o sin pago `captured` no se rechazan por ese solo motivo: son estados de negocio válidos que no cuentan como venta. Esta lista de cuatro motivos es cerrada; solo las devoluciones que no pueden procesarse (y, por moneda no soportada, pedidos o devoluciones) llegan a `rejected.csv`. Verificación: `K-10149` y `K-10062` no aparecen en `rejected.csv` como pedidos (E-8, E-13), mientras que `R-1005` sí aparece como devolución.
+**Decidido (A-9 de `spec.md`):** los pedidos cancelados o sin pago `captured` no se rechazan por ese solo motivo: son estados de negocio válidos que no cuentan como venta. Esta lista de motivos (siete tras la revisión 3) es cerrada; solo las devoluciones que no pueden procesarse (y, por moneda no soportada, pedidos o devoluciones) llegan a `rejected.csv`. Verificación: `K-10149` y `K-10062` no aparecen en `rejected.csv` como pedidos (E-8, E-13), mientras que `R-1005` sí aparece como devolución.
 
 **Archivos afectados:**
-- `sql/rejected.sql` (nuevo) o integración en `kivora/pipeline.py` con Python.
+- `sql/daily_customer_metrics.sql` (rechazos de origen SQL, `kpi_rejected`) y `kivora/metrics.py` (rechazos por moneda, importe o fecha). No se crea `sql/rejected.sql`.
 
 **Verificación:** `output/rejected.csv` contiene los registros rechazados con su `source`, `record_id` y `reason` explícito. Las duplicaciones de `refund_id` aparecen como filas propias en `rejected.csv`.
 
@@ -129,22 +145,23 @@ La exportación de `daily_customer_metrics.csv` y `rejected.csv` se hace desde l
 - C-3: devoluciones totales de un **pedido** no superan su importe bruto (anomalía de calidad; no bloquea).
 - C-4: cada `refund_id` aparece una sola vez tras deduplicación (consistencia).
 - C-5: cada fila de `rejected.csv` tiene `reason` no vacío (integridad del rechazo).
+- C-6: `sum(orders_count)` más los pedidos rechazados es igual al número de ventas válidas calculado **sin unir con clientes** (consistencia; detecta duplicados por join, E-15).
 
 **Separación clave:** Los controles C-2 y C-3 detectan anomalías de calidad que se reportan en `quality_report.json` con `passed: false`, pero **no** bloquean la ejecución ni impiden la escritura de los archivos de salida. El pipeline termina con código 0 aunque estos controles fallen. Solo un error de infraestructura (falta de archivo de entrada, fallo de SQL, etc.) impide la salida con código 0.
 
 **Archivos afectados:**
 - `kivora/pipeline.py` (generación del JSON).
 
-**Verificación:** `quality_report.json` tiene la estructura `{"checks": [{"name": "...", "passed": true/false, "failed_records": N}, ...]}` con al menos dos controles. Con los datos actuales, solo C-3 reporta `failed_records = 1` (`K-10148`: 101.20 EUR devueltos sobre 92.00 EUR); C-2 pasa con `failed_records = 0` (verificado: 118 filas cliente-día, ninguna con neto negativo). C-2 se mantiene para detectar casos futuros y, como los datos reales no lo ejercitan, su test usa datos sintéticos (paso 10).
+**Verificación:** `quality_report.json` tiene la estructura `{"checks": [{"name": "...", "passed": true/false, "failed_records": N}, ...]}` con al menos dos controles. Con los datos actuales, solo C-3 reporta `failed_records = 1` (`K-10148`: 101.20 EUR devueltos sobre 92.00 EUR); C-2 pasa con `failed_records = 0` (verificado: ninguna fila cliente-día con neto negativo; con `Europe/Madrid` hay 115 filas). C-2 se mantiene para detectar casos futuros y, como los datos reales no lo ejercitan, su test usa datos sintéticos (paso 10).
 
 ---
 
 ### Paso 9 · Tarea `acceptance` en `tasks.py`
 
-**Tarea:** Añadir a `tasks.py` la tarea `acceptance` que ejecute el pipeline sobre `data/inbox/` y compruebe los escenarios de aceptación de `spec.md` (E-1 a E-13), con código de salida 0 solo si todos pasan. La tarea no usa cantidades fijas de los datos actuales como reglas del pipeline; usa los valores actuales solo como ejemplos esperados en las aserciones.
+**Tarea:** Añadir la tarea `acceptance`, implementada en `kivora/acceptance.py` (como `check`) y expuesta en `tasks.py`: ejecuta el pipeline **dos veces** sobre `data/inbox/` en carpetas temporales (así comprueba también el determinismo, E-9) y verifica los escenarios de `spec.md` (E-1 a E-15), con código de salida 0 solo si todos pasan. No usa cantidades fijas de los datos actuales como reglas del pipeline; las usa solo como valores esperados en las aserciones.
 
 **Archivos afectados:**
-- `tasks.py`: nueva tarea `acceptance`.
+- `kivora/acceptance.py` (nuevo) y `tasks.py` (nueva tarea `acceptance`).
 
 **Verificación:** `uv run python tasks.py acceptance` termina con código 0 cuando todos los escenarios pasan.
 
@@ -168,11 +185,25 @@ La exportación de `daily_customer_metrics.csv` y `rejected.csv` se hace desde l
 12. Pedido confirmado sin pago `captured` no es venta (E-13, `K-10062`).
 13. Precisión monetaria con `Decimal`: un caso sintético en el que el redondeo `ROUND_HALF_UP` a dos decimales difiere del que daría un `float` o `REAL` (el caso concreto se fija al implementar, comprobando que el test falla con una implementación en coma flotante).
 14. Control C-2 con datos sintéticos que produzcan un neto negativo por cliente-día (los datos reales no lo ejercitan) y control C-3 con el pedido `K-10148`.
+15. `metric_date` en `Europe/Madrid` (RF-21): un pedido a las 22:30 UTC de verano pasa al día siguiente y uno a las 22:30 UTC de invierno no; en el límite exacto de cada estación.
+16. Última versión de cliente (RF-22): el país cambia entre versiones, una versión posterior con el país vacío da `UNKNOWN`, y un cliente con varias versiones no duplica pedidos (C-6).
+17. Rechazos: devolución sobre pedido cancelado, sobre pedido sin pago cobrado, `refund_id` duplicado, moneda no soportada e importe no válido (RF-23).
 
 **Archivos afectados:**
-- `tests/` (nuevos archivos de test).
+- `tests/test_kiv101.py` (nuevo).
 
 **Verificación:** `uv run python tasks.py test` termina con código de salida 0.
+
+---
+
+### Paso 11 · Ampliación de `kivora/check.py` (decisión de la fase 4)
+
+**Tarea:** `tasks.py check` valida también las salidas nuevas: columnas de `daily_customer_metrics.csv`, `rejected.csv` y estructura de `quality_report.json`; formato `AAAA-MM-DD` de las fechas; importes con dos decimales; `net_amount = gross_amount - refunded_amount` en cada fila; ninguna pareja (`metric_date`, `customer_id`) repetida; y `reason` no vacío. Un `net_amount` negativo **no** es un fallo de `check` (es una anomalía de negocio que ya señala C-2).
+
+**Archivos afectados:**
+- `kivora/check.py`.
+
+**Verificación:** `uv run python tasks.py check` sale con 0 sobre la salida válida y con 1 si falta una columna o se rompe el neto.
 
 ---
 
@@ -181,22 +212,24 @@ La exportación de `daily_customer_metrics.csv` y `rejected.csv` se hace desde l
 | Archivo | Acción | Motivo |
 |---------|--------|--------|
 | `kivora/ingest.py` | Modificar | Leer `refunds.json` en `raw_refunds` (amount como texto) |
-| `sql/staging.sql` | Modificar | Tabla nueva `stg_orders_latest` (una versión por `order_id`) y `stg_refunds`; `stg_orders` heredada sin cambios |
-| `sql/daily_customer_metrics.sql` | Crear | Selección de ventas válidas y devoluciones imputables, sin aritmética monetaria |
-| `kivora/metrics.py` | Crear | Conversión, agregación, neto y controles con `Decimal` |
-| `sql/rejected.sql` | Crear | Registros rechazados con motivo explícito |
+| `sql/staging.sql` | Modificar | Tablas nuevas `stg_orders_latest`, `stg_customers_latest` y `stg_refunds`; `stg_orders` y `stg_customers` heredadas sin cambios |
+| `sql/daily_customer_metrics.sql` | Crear | Selección de ventas válidas, devoluciones imputables y rechazos de origen SQL, sin aritmética monetaria |
+| `kivora/metrics.py` | Crear | Conversión, fecha `Europe/Madrid`, agregación, neto, rechazos y controles con `Decimal` |
 | `kivora/pipeline.py` | Modificar | Ejecutar nuevos scripts, exportar 4 CSV + 1 JSON, generar `quality_report.json` |
+| `kivora/acceptance.py` | Crear | Escenarios E-1 a E-15 sobre `data/inbox/` y determinismo |
+| `kivora/check.py` | Modificar | Validar también las salidas nuevas |
 | `tasks.py` | Modificar | Añadir tarea `acceptance` |
-| `tests/` | Crear | Tests de duplicados, nulos, devoluciones, neto, joins, monedas, determinismo |
-| `docs/specs/KIV-101/spec.md` | Sin cambios | Base de este plan |
+| `tests/test_kiv101.py` | Crear | Tests de duplicados, nulos, devoluciones, neto, joins, monedas, Madrid, clientes, rechazos y determinismo |
+| `sql/daily_sales.sql` | **Sin cambios** | Decisión del usuario: sigue en UTC (limitación conocida, A-10) |
+| `docs/specs/KIV-101/spec.md` | Actualizado en la fase 4 | RF-21 a RF-23, A-10, A-11, E-14, E-15, C-6 |
 
 ---
 
 ## 4. Pruebas
 
 - `uv run python tasks.py test`: tests unitarios (pytest), código de salida 0.
-- `uv run python tasks.py acceptance`: escenario completo sobre `data/inbox/`, código de salida 0 solo si todos los escenarios E-1 a E-13 pasan.
-- `uv run python tasks.py check`: comprobaciones básicas sobre `output/`.
+- `uv run python tasks.py acceptance`: escenario completo sobre `data/inbox/`, código de salida 0 solo si todos los escenarios E-1 a E-15 pasan.
+- `uv run python tasks.py check`: comprobaciones sobre `output/`, ahora también de las salidas nuevas.
 - Determinismo: ejecutar el pipeline dos veces y comparar archivos de salida byte a byte.
 
 ---
@@ -212,14 +245,15 @@ Incluidos en `quality_report.json` (espec.md, sección 8):
 | C-3 | `refunded_not_exceeds_gross_per_order` | Anomalía | Algún **pedido** con devoluciones totales > importe bruto del pedido (con los datos actuales: `K-10148`, 1 registro) |
 | C-4 | `no_duplicate_refund_ids` | Consistencia | Algún `refund_id` repetido tras deduplicación |
 | C-5 | `all_rejected_records_have_reason` | Integridad | Alguna fila de `rejected.csv` con `reason` vacío |
+| C-6 | `orders_reconcile_with_valid_sales` | Consistencia | `sum(orders_count)` + pedidos rechazados ≠ nº de ventas válidas calculado sin unir con clientes |
 
-C-1, C-4 y C-5 son controles de consistencia que deben pasar siempre. C-2 y C-3 son controles de anomalía de negocio que pueden fallar con datos válidos del origen; se reportan en `quality_report.json` pero no bloquean la ejecución.
+C-1, C-4, C-5 y C-6 son controles de consistencia que deben pasar siempre. C-2 y C-3 son controles de anomalía de negocio que pueden fallar con datos válidos del origen; se reportan en `quality_report.json` pero no bloquean la ejecución.
 
 ---
 
 ## 6. Criterios de aceptación
 
-El plan se considera completo cuando se cumplen todos los escenarios de `spec.md` (E-1 a E-13):
+El plan se considera completo cuando se cumplen todos los escenarios de `spec.md` (E-1 a E-15):
 
 - **E-1:** Duplicados exactos de pedidos no se duplican en el conteo ni el importe.
 - **E-2:** Clientes sin país aparecen con `country = UNKNOWN` y sus ventas no se pierden.
@@ -234,6 +268,8 @@ El plan se considera completo cuando se cumplen todos los escenarios de `spec.md
 - **E-11:** `refund_id` duplicado se cuenta una vez y la repetición se informa en `rejected.csv`.
 - **E-12:** Se usa la última versión de un pedido por `updated_at` (`K-10151`: 58.50, no 64.00) y las filas repetidas con el mismo `updated_at` (`K-10060`) cuentan una vez.
 - **E-13:** Un pedido confirmado sin pago `captured` (`K-10062`) no cuenta como venta.
+- **E-14:** `metric_date` usa `Europe/Madrid`: `K-10053` y `K-10054` pasan al día siguiente.
+- **E-15:** Con la última versión de cliente, `C005` no duplica pedidos y el control C-6 pasa.
 
 Además:
 - `uv run python tasks.py test` → salida 0.
@@ -246,9 +282,8 @@ Además:
 
 ## 7. Criterios de cierre de la fase
 
-- `spec.md` y `plan.md` commiteados (al menos dos commits: borrador y revisión).
-- Sin cambios en `kivora/`, `sql/` ni `tests/` en esta fase (solo especificación y plan).
-- Tag `phase-2` creado al cerrar la fase (pendiente).
+- **Fase 2 (cerrada):** `spec.md` y `plan.md` commiteados (borrador y revisión); tag `phase-2`.
+- **Fase 4:** `spec.md` y `plan.md` actualizados y commiteados (revisión 3) **antes** del primer commit de código; `tasks.py test`, `tasks.py acceptance` y `tasks.py check` en verde; determinismo comprobado; tag `phase-4`.
 
 ---
 
@@ -355,3 +390,23 @@ Cambios sobre la revisión 1 (commit `b7513de`), a raíz de cinco incidencias de
 **Aclaración A-9, resuelta.** Los pedidos cancelados o sin pago cobrado no aparecen en `rejected.csv` por ese solo motivo; las devoluciones que no puedan procesarse siguen rechazándose (paso 6).
 
 **Aclaraciones de las decisiones 2 y 10.** El usuario confirmó que están documentadas en RF-7 y RF-17 y que no hacen falta entradas nuevas en «Aclaraciones» de `spec.md`.
+
+---
+
+## 10. Revisión 3 (fase 4, antes de escribir código)
+
+Cuatro decisiones del usuario, más un caso que detectó el revisor independiente (`kivora-reviewer`) y la implementación necesita cerrar.
+
+| # | Cuestión | Decisión | Cambio en este plan | Justificación |
+|---|---|---|---|---|
+| 1 | Zona horaria de `metric_date` (6 de 156 ventas cambian de día) | `Europe/Madrid` (RF-21, A-10); `daily_sales.sql` **no se modifica** y queda en UTC como limitación conocida | Paso 5 (cálculo en Python con `zoneinfo`), test 15, E-14, E-6 reescrito | Coherente con el contrato de `daily_sales`; SQLite no maneja zonas horarias; modificar `daily_sales` queda fuera de KIV-101 |
+| 2 | Versiones de cliente (`C005` llega tres veces; `stg_customers` conserva dos filas) | Última versión disponible; país vacío → `UNKNOWN` (RF-22, A-11) | Paso 2b nuevo (`stg_customers_latest`), Paso 5, test 16, E-15 | Determinista y sin duplicados; no se inventan datos |
+| 3 | Control de conciliación y validación de salidas | Control C-6 y ampliación de `kivora/check.py` | Pasos 8 y 11, sección 5 | C-6 es el que detecta duplicados por join; `check` debe cubrir las salidas nuevas |
+| 4 | Orden del historial | Primero un commit solo de documentación (`spec.md` y `plan.md`) y después el código | Sección 7 | El enunciado puntúa «nada de código antes de especificar» y «plan revisado antes de implementar» |
+| 5 | Datos defectuosos no previstos (hallazgos 8 y 15 del revisor): devolución sobre un pedido existente sin pago cobrado, importes o fechas inválidos | Rechazar con motivo explícito en lugar de fallar o descartar en silencio (RF-23) | Paso 6 (siete motivos), test 17 | El ticket pide no tirar registros sin más; el pipeline debe funcionar con datos desconocidos. **Pendiente de confirmación del usuario** |
+
+**Cambios de diseño que se desprenden de lo anterior:**
+
+- `sql/rejected.sql` no se crea: los rechazos de origen SQL viven en `sql/daily_customer_metrics.sql` y el resto en `kivora/metrics.py`.
+- La tarea `acceptance` vive en `kivora/acceptance.py`, ejecuta el pipeline dos veces y así comprueba también el determinismo.
+- Los tests nuevos van en `tests/test_kiv101.py`; los cuatro tests heredados no se tocan.
