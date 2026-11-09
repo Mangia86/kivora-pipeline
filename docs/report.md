@@ -1,9 +1,9 @@
 # Memoria de la práctica · Pipeline Kivora
 
-**Versión:** 0.4, fase 3 (configuración del agente) añadida sobre la 0.3 de cierre de la fase 2. La 0.1 se commiteó en `efe0bcc` y la 0.3 en `f37e4ee`.
-**Estado:** documenta lo ocurrido hasta la fase 3 (la sección 2 está completa, pendiente de commit y de `phase-3`). Las secciones que dependen de las fases 4 a 6 están marcadas como **PENDIENTE** y no contienen resultados ni decisiones inventados.
+**Versión:** 0.5, fase 4 (implementación de KIV-101) añadida sobre la 0.4 de la fase 3. La 0.1 se commiteó en `efe0bcc`, la 0.3 en `f37e4ee` y la 0.4 en `dcc4bbb`.
+**Estado:** documenta lo ocurrido hasta la fase 4 (implementación, pruebas y trazabilidad completas; pendiente de cerrar con el tag `phase-4`). Las secciones que dependen de las fases 5 y 6 están marcadas como **PENDIENTE** y no contienen resultados ni decisiones inventados.
 
-**Historial de referencia (fase 2):**
+**Historial de referencia (fases 2 a 4):**
 
 | Commit | Contenido |
 |---|---|
@@ -14,9 +14,15 @@
 | `b7513de` | `plan.md` revisado, con la sección «Revisión del plan» |
 | `efe0bcc` | `docs/report.md`, versión 0.1 |
 | `f37e4ee` | `Fase 2: cerrar especificacion, plan y memoria de KIV-101`: corrección de las cinco incidencias y resolución de A-9 en `spec.md`, `plan.md` y `report.md` |
-| *(commit de evidencia, ver `git log`)* | `Fase 2: incorporar evidencia de Claude Code`: `docs/sessions/fase-2-sesion-claude.md` y nota en esta memoria |
+| `ad71b5a` | `Fase 2: incorporar evidencia de Claude Code`: `docs/sessions/fase-2-sesion-claude.md` y nota en esta memoria (tag `phase-2`) |
+| `dcc4bbb` | Fase 3: permisos, hook `kivora_guard` y subagente `kivora-reviewer` (tag `phase-3`) |
+| `642e773` | Fase 4: `spec.md` y `plan.md` actualizados **antes** del código (RF-21 a RF-23, A-10, A-11, E-14, E-15, C-6, revisión 3) |
+| `a77d5f4` | Fase 4: `daily_customer_metrics`, `rejected.csv` y `quality_report.json` (ingest, staging, SQL y `kivora/metrics.py`) |
+| `d1a0b6e` | Fase 4: 16 tests de KIV-101 |
+| `2b87363` | Fase 4: tarea `acceptance` y ampliación de `check` |
+| *(commit de documentación, ver `git log`)* | Fase 4: respuesta a Finanzas en `docs/tickets/KIV-101.md` y esta memoria (v0.5) |
 
-El tag `phase-1` existe; `phase-2` **todavía no está creado**.
+Los tags `phase-1`, `phase-2` y `phase-3` existen; `phase-4` **todavía no está creado**.
 
 ---
 
@@ -88,6 +94,18 @@ Cifras de los escenarios nuevos (verificadas con un cálculo sobre `data/inbox/`
 Para eliminar contradicciones con A-9 se ajustó también `spec.md` §5.2: la lista de ejemplos de `reason` incluía `cliente no encontrado`, que contradecía RF-15 (un cliente sin país o inexistente se conserva con `UNKNOWN`), y `source` admitía `payments` y `customers`, que nunca se rechazan.
 
 **Pendiente para la fase 4:** comprobar empíricamente que ningún importe pasa por coma flotante y fijar el caso sintético del test de redondeo `ROUND_HALF_UP`.
+
+### 1.5 Decisiones de la fase 4 (implementación de KIV-101)
+
+| # | Decisión | Quién | Dónde queda |
+|---|---|---|---|
+| 1 | `metric_date` en `Europe/Madrid`, coherente con el contrato de `daily_sales`. `daily_sales.sql` **no se modifica** y sigue en UTC: la diferencia es una limitación conocida | Propuesta de Claude tras medir el impacto (6 de 156 ventas cambian de día); decisión del usuario | `spec.md` RF-21, A-10, E-14; `plan.md` paso 5; respuesta a Finanzas |
+| 2 | Última versión disponible de cada cliente; país vacío → `UNKNOWN` sin rellenar con versiones anteriores | Claude propuso; decisión del usuario | `spec.md` RF-22, A-11, E-15; `plan.md` paso 2b |
+| 3 | Control C-6 (conciliación de ventas) y ampliación de `check.py` | Claude propuso; decisión del usuario | `spec.md` C-6; `plan.md` pasos 8 y 11 |
+| 4 | Primero un commit solo de documentación (`spec.md` y `plan.md`) y después el código | Decisión del usuario | Commit `642e773`, anterior a todo el código |
+| 5 | Defensa ante datos defectuosos (RF-23): devolución sobre un pedido sin pago cobrado, importes o fechas ilegibles se rechazan con motivo explícito | **Claude, sin aprobación explícita**: cierra un caso que señaló el revisor independiente (hallazgos 8 y 15) y evita que el pipeline falle con datos desconocidos | `spec.md` RF-23 y §5.2 (siete motivos); `plan.md` paso 6. **Pendiente de confirmación del usuario** |
+
+Decisiones de diseño derivadas: la fecha de Madrid y toda la aritmética monetaria se calculan en Python (`kivora/metrics.py`); SQL solo selecciona; `stg_orders` y `stg_customers` heredadas no se tocan; `acceptance` trabaja sobre las entregas hasta 2026-09-07 (copiadas a una carpeta temporal) para que las entregas posteriores no muevan las cifras esperadas.
 
 ---
 
@@ -241,38 +259,63 @@ Nota verificable: tras los errores de las vueltas 4 y 7, el contexto posterior (
 - **Privacidad:** una búsqueda por patrones (no una lectura línea a línea) no encontró credenciales ni claves. El export contiene rutas locales, el usuario de GitHub y nombres del material del curso, aceptados por el usuario.
 - **Alcance temporal:** el export termina antes del commit de esta evidencia y del tag `phase-2`.
 
+### Ciclo de iteración de la fase 4 (KIV-101)
+
+Vueltas reales, en orden. Criterio de «terminado»: `tasks.py test`, `tasks.py acceptance` y `tasks.py check` en verde, determinismo comprobado, tests que fallan con el código roto, `data/`, `deliveries/` y `daily_sales.sql` intactos, y `spec.md`, `plan.md` y código coherentes.
+
+| # | Feedback que se dio | Qué cambió | Resultado |
+|---|---|---|---|
+| 1 | Revisión de `spec.md`, `plan.md`, KIV-100, `CLAUDE.md` e informe y petición de resolver Madrid y última versión de cliente, sin tocar nada | Una única comprobación de impacto con los datos: 6 de 156 ventas cambian de día con Madrid; solo `C005` tiene varias versiones; solo cambia E-6 | El usuario aprobó las cuatro decisiones (sección 1.5) |
+| 2 | «Actualizar primero `spec.md` y `plan.md`» | RF-21 a RF-23, A-10, A-11, E-14, E-15, C-6, E-6 y E-8 con cifras verificadas, revisión 3 del plan; se limpiaron frases desactualizadas y una errata que había señalado el revisor | Commit solo de documentación `642e773` |
+| 3 | Salida del primer `tasks.py run` frente a la especificación | Datos (`refunds.json`, staging con última versión), selecciones SQL y `kivora/metrics.py` | 115 filas, 3 rechazos (`R-1003`, `R-1005`, `R-1006`), solo C-3 con anomalía, `C003` y `C005` con las cifras de la spec. Commit `a77d5f4` |
+| 4 | Salida de los tests y mutaciones del código real | 16 tests con datos sintéticos | 20 passed (4 heredados + 16). Seis mutaciones (join con la tabla heredada, versión más antigua, UTC en vez de Madrid, `ROUND_HALF_EVEN`, sin exigir pago cobrado, duplicados de `refund_id` sin descartar) hacen fallar al menos un test cada una. Commit `d1a0b6e` |
+| 5 | Salida de `acceptance`, de `check` con una salida rota a propósito y de dos ejecuciones con la interfaz oficial | `kivora/acceptance.py`, ampliación de `kivora/check.py` y tarea en `tasks.py` | `acceptance` 28 de 28 a la primera (incluidas las cifras de E-14 calculadas a mano en la spec); `check` sale con 1 con un neto roto y con 0 al restaurar; los hashes SHA-256 de las tres salidas coinciden entre ejecuciones. Commit `2b87363` |
+| 6 | Respuesta a Finanzas en lenguaje de negocio | `docs/tickets/KIV-101.md` e informe | Cifras tomadas de la salida: 156 ventas, 18.490,74 € bruto, 1.310,19 € devuelto, 17.180,55 € neto |
+
+Nota honesta: los 16 tests y las 28 comprobaciones de `acceptance` pasaron a la primera, sin ninguna vuelta de corrección de código. Por eso se añadió la comprobación por mutación (vuelta 4): un test que pasa a la primera solo es fiable si se demuestra que falla cuando la regla se rompe.
+
 ---
 
 ## 4. Trazabilidad
 
-Estado en la fase 2: existen requisitos (`spec.md`), escenarios de aceptación (E-1 a E-13), controles de calidad (C-1 a C-5) y pasos del plan. **Todavía no existen tests ni la tarea `acceptance`**: la columna de verificación es **PENDIENTE (fase 4)** para todas las filas. Las cifras de los escenarios se calcularon sobre `data/inbox/` (7 días).
+Estado en la fase 4: cada requisito tiene escenario, control, test y comprobación de `acceptance`. Tests en `tests/test_kiv101.py`: **T1** `duplicate_orders_and_versions_count_once`, **T2** `null_country_and_unknown_customer_become_unknown`, **T3** `partial_refund_is_attributed_to_the_purchase_day`, **T4** `several_refunds_on_one_order_accumulate_without_duplicating_it`, **T5** `refund_without_order_is_rejected_and_not_counted`, **T6** `net_amount_with_currency_conversion_and_half_up_rounding`, **T7** `payments_validate_the_sale_but_never_multiply_it`, **T8** `customer_versions_do_not_duplicate_orders_and_the_latest_wins`, **T9** `empty_country_in_the_latest_customer_version_is_unknown`, **T10** `metric_date_is_the_europe_madrid_date`, **T11** `rejected_records_have_an_explicit_reason`, **T12** `refund_larger_than_the_purchase_is_kept_and_flagged_by_the_controls`, **T13** `days_without_refunds_file_or_with_an_empty_list_are_fine`, **T14** `outputs_are_deterministic`, **T15** `control_c6_detects_orders_duplicated_by_a_join`, **T16** `quality_anomalies_do_not_change_the_exit_code`.
 
-| Requisito | Escenarios | Control de calidad | Paso del plan | Test / `acceptance` |
+| Requisito | Escenarios | Control | Tests | `acceptance` / `check` |
 |---|---|---|---|---|
-| RF-1 columnas y grano | E-2, E-3, E-4, E-6 | C-1 | 5 | PENDIENTE |
-| RF-2 `rejected.csv` (solo devoluciones no procesables y moneda no soportada; no pedidos cancelados ni sin pago, A-9) | E-5, E-8, E-11, E-13 | C-5 | 6 | PENDIENTE |
-| RF-3 `quality_report.json` | — (sin escenario propio) | C-1 a C-5 | 8 | PENDIENTE |
-| RF-4 EUR y dos decimales (con `Decimal` en Python, RNF-2) | E-10 | C-1 | 5, 10 (test 13) | PENDIENTE |
-| RF-5 moneda no soportada | — (los datos actuales solo tienen EUR, GBP y USD, todas en la tabla) | — | 6 | PENDIENTE (requerirá dato sintético) |
-| RF-6 un pedido, una vez | E-1, E-7 | — | 2, 3 | PENDIENTE |
-| RF-7 última versión por `updated_at` y desempate | E-12 (también E-8) | — | 2, 10 (test 11) | PENDIENTE |
-| RF-8 venta válida | E-8, E-13 | — | 5, 10 (test 12) | PENDIENTE |
-| RF-9 pagos no multiplican | E-7 | — | 3, 5 | PENDIENTE |
-| RF-10 `refund_id` único | E-11 | C-4 | 4, 6 | PENDIENTE |
-| RF-11 atribución al día de compra | E-3, E-4, E-6 | — | 5 | PENDIENTE |
-| RF-12 pedido inexistente | E-5 | C-5 | 6 | PENDIENTE |
-| RF-13 pedido cancelado | E-8 | C-5 | 6 | PENDIENTE |
-| RF-14 devoluciones parciales y múltiples | E-3, E-4 | C-3 | 5 | PENDIENTE |
-| RF-15 país `UNKNOWN` | E-2 | — | 5 | PENDIENTE |
-| RF-16 `last_purchase_date` | Sin escenario propio por diseño: con el grano vigente coincide con `metric_date` en todas las filas (se observa en todos los escenarios de métricas) | — | 5 | PENDIENTE |
-| RF-17 neto y anomalías | E-4, E-6 | C-1, C-2 (hoy 0 fallos; test con datos sintéticos), C-3 (hoy 1 fallo: `K-10148`) | 5, 8, 10 (test 14) | PENDIENTE |
-| RF-18 determinismo | E-9 | — | 9, 10 | PENDIENTE |
-| RF-19 no escribir en la entrada | — | — | — | PENDIENTE |
-| RF-20 código de salida 0 | — | C-2, C-3 (no bloquean) | 8 | PENDIENTE |
+| RF-1 columnas y grano | E-2, E-3, E-4, E-6 | C-1 | T3, T6 | acceptance E-2 a E-6; `check` (columnas, fechas, importes, filas repetidas) |
+| RF-2 `rejected.csv` | E-5, E-8, E-11, E-13 | C-5 | T5, T11 | acceptance E-5, E-8, E-11, E-13; `check` (motivo no vacío) |
+| RF-3 `quality_report.json` | — | C-1 a C-6 | T12 | acceptance C-1..C-6; `check` (estructura) |
+| RF-4 EUR y dos decimales | E-10 | C-1 | T6 | acceptance E-4/E-10; `check` (dos decimales) |
+| RF-5 moneda no soportada | — (los datos actuales solo tienen EUR, GBP y USD) | — | T11 | — (dato sintético) |
+| RF-6 un pedido, una vez | E-1, E-7 | C-6 | T1, T7, T8 | acceptance E-1, E-7, E-15 |
+| RF-7 última versión de pedido | E-12 | — | T1 | acceptance E-12 |
+| RF-8 venta válida | E-8, E-13 | — | T7, T11 | acceptance E-8, E-13 |
+| RF-9 pagos no multiplican | E-7 | — | T7 | acceptance E-7 |
+| RF-10 `refund_id` único | E-11 | C-4 | T11 | acceptance E-11 |
+| RF-11 atribución al día de compra | E-3, E-4, E-6 | — | T3, T10 | acceptance E-3, E-4, E-6 |
+| RF-12 pedido inexistente | E-5 | C-5 | T5 | acceptance E-5 |
+| RF-13 pedido cancelado | E-8 | C-5 | T11 | acceptance E-8 |
+| RF-14 devoluciones parciales y múltiples | E-3, E-4 | C-3 | T3, T4 | acceptance E-3, E-4 |
+| RF-15 país `UNKNOWN` | E-2 | — | T2, T9 | acceptance E-2 |
+| RF-16 `last_purchase_date` | (se observa en todos los escenarios de métricas) | — | T10 | acceptance E-2, E-4; `check` (no posterior a `metric_date`) |
+| RF-17 neto y anomalías | E-4, E-6 | C-1, C-2, C-3 | T12 | acceptance C-1..C-6 (C-3 detecta `K-10148`) |
+| RF-18 determinismo | E-9 | — | T14 | acceptance E-9; hashes SHA-256 con la interfaz oficial |
+| RF-19 no escribir en la entrada | — | — | — | acceptance trabaja sobre una copia; `git status` sin cambios en `data/` y `deliveries/` |
+| RF-20 código de salida 0 | — | C-2, C-3 | T16 | `tasks.py run` sale con 0 con C-3 en anomalía |
+| RF-21 fecha `Europe/Madrid` | E-14, E-6 | — | T10 | acceptance E-14 |
+| RF-22 última versión de cliente | E-15 | C-6 | T8, T9, T15 | acceptance E-15 |
+| RF-23 datos defectuosos | — (los datos actuales no los contienen) | C-5, C-6 | T11, T13 | — (dato sintético) |
 
-**Lagunas de cobertura que siguen abiertas:** RF-3, RF-19 y RF-20 no tienen escenario de aceptación propio; RF-5 (moneda no soportada) no aparece en los datos actuales y requerirá un dato sintético. De los 158 pedidos únicos, 156 son venta; los dos que no lo son son `K-10149` (E-8) y `K-10062` (E-13). Las lagunas de RF-7 y RF-8 se cerraron con E-12 y E-13.
+**Lagunas que siguen abiertas:** RF-5 y RF-23 no tienen dato real en `data/inbox/`, por lo que solo los cubren tests con datos sintéticos; RF-19 se comprueba con `git status`, no con un test automático.
 
-**Cifras verificadas de los escenarios** (nivel cliente-día salvo indicación): `C009 / 09-01` 1 pedido, 45.90; `C017 / 09-06` 1 pedido, 23.10; `C007 / 09-01` 2 pedidos, 246.66 bruto, 41.51 devuelto, 205.15 neto; `C020 / 09-01` 72.77 / 21.83 / 50.94; `C022 / 09-04` 3 pedidos, 325.17 / 126.02 / 199.15, 3 devoluciones; `C003 / 09-01` 3 pedidos, 446.64 / 74.53 / 372.11; `C018 / 09-04` 245.70; `C006 / 09-06` 134.50; `C028 / 09-04` 196.69 / 12.00; `C010 / 09-04` 258.32 / 99.91 / 158.41; `C021 / 09-02` 78.68 / 39.34 / 39.34; `C024 / 09-02` 197.51. Por pedido: `K-10148` 92.00 EUR comprados y 101.20 EUR devueltos (`R-1004` 55.20 + `R-1009` 46.00).
+**Resultados de la verificación (fase 4):**
+
+- `uv run python tasks.py test`: 20 passed (4 heredados y 16 nuevos).
+- `uv run python tasks.py acceptance`: 28 de 28 comprobaciones.
+- `uv run python tasks.py check`: OK; con un neto roto a propósito sale con 1.
+- Determinismo: dos ejecuciones con `python -m kivora` dan los mismos SHA-256 en `daily_customer_metrics.csv`, `rejected.csv` y `quality_report.json`.
+- Mutaciones: 6 de 6 detectadas por los tests (sección 3).
+- Cifras verificadas de la salida: 115 filas cliente-día, 32 clientes, 156 ventas, 18.490,74 EUR bruto, 1.310,19 EUR devuelto en 29 devoluciones, 17.180,55 EUR neto, 3 rechazos y solo C-3 con anomalía (`K-10148`: 101,20 EUR devueltos sobre 92,00 EUR). Con fechas UTC habría 118 filas.
 
 ---
 
