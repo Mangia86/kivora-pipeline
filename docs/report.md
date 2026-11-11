@@ -1,9 +1,9 @@
 # Memoria de la práctica · Pipeline Kivora
 
-**Versión:** 0.5, fase 4 (implementación de KIV-101) añadida sobre la 0.4 de la fase 3. La 0.1 se commiteó en `efe0bcc`, la 0.3 en `f37e4ee` y la 0.4 en `dcc4bbb`.
-**Estado:** documenta lo ocurrido hasta la fase 5 (KIV-102: la sección 5 «Cambio de esquema» está completa; pendiente de cerrar con el tag `phase-5`). Las secciones que dependen de la fase 6 están marcadas como **PENDIENTE** y no contienen resultados ni decisiones inventados.
+**Versión:** 1.0, fase 6 (cierre del proyecto), sobre la 0.5 de la fase 4; la sección 5 se añadió en la fase 5. La 0.1 se commiteó en `efe0bcc`, la 0.3 en `f37e4ee`, la 0.4 en `dcc4bbb` y la 0.5 en `b5aa5d2`; la 1.0 se commitea en la fase 6 (ver `git log`).
+**Estado:** documenta el proyecto completo, de la fase 1 a la 6, con las siete secciones del apartado 6 del enunciado. Solo falta cerrar con el tag `phase-6` y el push. Cada cifra remite a una ejecución, a un commit o a un documento del repositorio.
 
-**Historial de referencia (fases 2 a 4):**
+**Historial de referencia (fases 2 a 6):**
 
 | Commit | Contenido |
 |---|---|
@@ -21,9 +21,21 @@
 | `d1a0b6e` | Fase 4: 16 tests de KIV-101 |
 | `2b87363` | Fase 4: tarea `acceptance` y ampliación de `check` |
 | `b5aa5d2` | Fase 4: respuesta a Finanzas en `docs/tickets/KIV-101.md` y esta memoria (v0.5) |
-| *(commit de corrección documental, ver `git log`)* | Fase 4: RF-23 aprobado por el usuario en `spec.md`, `plan.md` y esta memoria |
+| `37f73ae` | Fase 4: RF-23 aprobado por el usuario en `spec.md`, `plan.md` y esta memoria |
+| `20a6816` | Fase 4: sesión exportada de Claude Code, `docs/sessions/fase-4-sesion-claude.md` (tag `phase-4`) |
+| `9351756` | Fase 5: entrega 2 (13 ficheros: 3 días × 4 ficheros y `docs/tickets/KIV-102.md`), en un commit propio |
+| `677fc96` | Fase 5: `docs/specs/KIV-102/impact.md`, **antes** de cualquier cambio de código |
+| `4642b3b`, `a644c23` | Fase 5: `spec.md` y `plan.md` de KIV-102 (el plan con su «Revisión del plan») |
+| `ce57809`, `3f3cdbe` | Fase 5: 31 tests de KIV-102 (21 en rojo con el código de la fase 4) y `acceptance` ampliado (en rojo) |
+| `c978007` | Fase 5: `kivora/ingest.py` lee los dos formatos de `refunds.json` (único cambio de código de producción de la fase) |
+| `da786bf`, `b7b7124`, `73eebb6` | Fase 5: `docs/sources.md`, respuesta en `docs/tickets/KIV-102.md` y sección 5 de esta memoria |
+| `23628be` | Fase 5: sesión exportada, `docs/sessions/fase-5-sesion-claude.md` (tag `phase-5`) |
+| `6c6a4e2` | Fase 6: `docs/review.md`, revisión final con `kivora-reviewer` |
+| `85a49b2`, `1a4d610` | Fase 6: `README.md` y `CLAUDE.md` actualizados |
+| `ac49701` | Fase 6: la sesión de la fase 1 pasa a `docs/sessions/` (`git mv`, renombrado al 100 %) |
+| *(commit de esta memoria, ver `git log`)* | Fase 6: secciones 3, 6 y 7 completas, referencias obsoletas corregidas e historial actualizado |
 
-Los tags `phase-1`, `phase-2` y `phase-3` existen; `phase-4` **todavía no está creado**.
+**Tags** (de `phase-2` a `phase-5` anotados; `phase-1` es ligero; todos publicados en `origin`): `phase-1` → `4d88adb`, `phase-2` → `ad71b5a`, `phase-3` → `dcc4bbb`, `phase-4` → `20a6816`, `phase-5` → `23628be`. `phase-6` se crea al cerrar la fase.
 
 ---
 
@@ -94,7 +106,7 @@ Cifras de los escenarios nuevos (verificadas con un cálculo sobre `data/inbox/`
 
 Para eliminar contradicciones con A-9 se ajustó también `spec.md` §5.2: la lista de ejemplos de `reason` incluía `cliente no encontrado`, que contradecía RF-15 (un cliente sin país o inexistente se conserva con `UNKNOWN`), y `source` admitía `payments` y `customers`, que nunca se rechazan.
 
-**Pendiente para la fase 4:** comprobar empíricamente que ningún importe pasa por coma flotante y fijar el caso sintético del test de redondeo `ROUND_HALF_UP`.
+**Resuelto en la fase 4:** el caso sintético del redondeo `ROUND_HALF_UP` es el test `net_amount_with_currency_conversion_and_half_up_rounding` (medio céntimo exacto: `0.125` da `0.13`; un `float` daría `0.12`), y la mutación a `float` o a `ROUND_HALF_EVEN` hace fallar los tests (sección 3, vuelta 4, y `docs/review.md`, sección 3).
 
 ### 1.5 Decisiones de la fase 4 (implementación de KIV-101)
 
@@ -106,13 +118,18 @@ Para eliminar contradicciones con A-9 se ajustó también `spec.md` §5.2: la li
 | 4 | Primero un commit solo de documentación (`spec.md` y `plan.md`) y después el código | Decisión del usuario | Commit `642e773`, anterior a todo el código |
 | 5 | Defensa ante datos defectuosos (RF-23): devolución sobre un pedido sin pago cobrado, importes o fechas ilegibles se rechazan con motivo explícito | Propuesta de Claude, a partir de un caso que señaló el revisor independiente (hallazgos 8 y 15): evita que el pipeline falle con datos desconocidos. **Aprobada por el usuario**, que confirmó mantenerla en la especificación y en la implementación | `spec.md` RF-23 y §5.2 (siete motivos); `plan.md` paso 6 |
 
+### 1.6 Decisiones de las fases 5 y 6
+
+- **Fase 5 (KIV-102):** las decisiones A-1 a A-11 del nuevo formato de `refunds.json`, con quién propuso cada una y cuál fue el resultado, están en la sección 5.2. La decisión A-10 (rechazar importes cero o negativos) la propuso el agente y **no se autorizó**: KIV-101 no lo exige y se conservó el comportamiento anterior.
+- **Fase 6 (revisión final):** las decisiones sobre los nueve hallazgos de `kivora-reviewer` están en `docs/review.md` y se resumen en la sección 6. Las principales, del usuario: **no modificar** `daily_sales` y `top_customers` (H1) ni la robustez ante entradas malformadas (H6), documentando ambos riesgos; no reescribir el historial por los commits antiguos sin `Co-Authored-By` (H2); conservar las cifras históricas de la respuesta de KIV-101 (H9); y no añadir `*.jsonl` a `.gitignore` (el hook ya bloquea su commit).
+
 Decisiones de diseño derivadas: la fecha de Madrid y toda la aritmética monetaria se calculan en Python (`kivora/metrics.py`); SQL solo selecciona; `stg_orders` y `stg_customers` heredadas no se tocan; `acceptance` trabaja sobre las entregas hasta 2026-09-07 (copiadas a una carpeta temporal) para que las entregas posteriores no muevan las cifras esperadas.
 
 ---
 
 ## 2. Configuración del agente
 
-**Estado:** implementada en la fase 3 y verificada; pendiente de commit y del tag `phase-3`. Antes de la fase 3 no existía `.claude/`, el `settings.json` de usuario solo tenía `theme` y `model`, y las reglas de `CLAUDE.md` (solo instrucciones) las repetías tú en casi cada prompt: 18 de 20 prompts de la sesión de la fase 2 repiten «no commit/push», 16 «no modifiques código/datos», 16 «no crees tags» y 3 «no ejecutes `deliver 2`».
+**Estado:** implementada en la fase 3 y verificada; cerrada con el tag `phase-3` (`dcc4bbb`). Desde entonces `.claude/` no ha cambiado (`git log phase-3..HEAD -- .claude` no devuelve ningún commit). Antes de la fase 3 no existía `.claude/`, el `settings.json` de usuario solo tenía `theme` y `model`, y las reglas de `CLAUDE.md` (solo instrucciones) las repetías tú en casi cada prompt: 18 de 20 prompts de la sesión de la fase 2 repiten «no commit/push», 16 «no modifiques código/datos», 16 «no crees tags» y 3 «no ejecutes `deliver 2`».
 
 ### 2.1 Qué se ha configurado
 
@@ -172,7 +189,8 @@ No se usa nada instalado por OpenSpec. Permisos, para Bash y para PowerShell (es
 - *Problema:* las 5 incidencias de la fase 2 (fechas de `R-1006`, control C-2 falso, `last_purchase_date` redundante, RF-7 y RF-8 sin escenario, `CAST AS NUMERIC` presentado como equivalente a `Decimal`) las detectamos tarde y con scripts improvisados.
 - *Por qué un subagente:* trabaja con contexto aislado, sin anclarse en las conclusiones del autor, y es de solo lectura (`disallowedTools: Write, Edit, NotebookEdit`; el hook R1 también le aplica).
 - *Qué aporta frente a pedírselo al agente principal:* otro contexto y un procedimiento fijo (hechos frente a datos, consistencia entre documentos, cobertura, formato de hallazgos con evidencia).
-- *Límite:* no es determinista. Se reutiliza como revisor independiente en la fase 6.
+- *Límite:* no es determinista.
+- *Uso posterior (fases 5 y 6):* revisó `impact.md`, `spec.md`, `plan.md`, el código y la memoria de KIV-102, y el proyecto entero (`docs/review.md`). Sus hallazgos cambiaron lo escrito cada vez (secciones 5.3 y 6).
 
 ### 2.4 Cómo se ejecutan
 
@@ -218,7 +236,13 @@ No se usa nada instalado por OpenSpec. Permisos, para Bash y para PowerShell (es
 - En `claude -p` sobre una carpeta no confiada se ignoran las reglas `allow` del proyecto; los hooks y los `deny`/`ask` siguen aplicando.
 - **Recuperación manual (solo una persona; verificada):** poner `{"disableAllHooks": true}` en `.claude/settings.local.json` (no se versiona), corregir el fallo, validar con `claude doctor` y quitar esa línea.
 
-### 2.7 No verificado
+### 2.7 Uso real del guard en las fases 4 a 6
+
+- **R4 (código tras los documentos):** en la fase 5 `impact.md`, `spec.md` y `plan.md` se commitearon antes de tocar `tests/`, `kivora/` o `tasks.py` (por eso el plan incluyó la tarea de commitearlo antes de empezar los tests).
+- **R1 (datos de entrada):** bloqueó una orden legítima de la fase 5 (un script que escribía un documento y mencionaba `data/inbox`). Era un falso positivo: no se esquivó con otra orden, se pidió la decisión a la persona responsable y el cambio se aplicó con la herramienta de edición. Volvió a ocurrir en la fase 6, al escribir esta memoria con un script, con el mismo tratamiento.
+- **Pruebas del hook:** siguen en 34 passed en las fases 5 y 6 (sección 2.5; `docs/review.md`).
+
+### 2.8 No verificado
 
 - El prompt interactivo de `ask` (solo se vio que no se aprueba solo, en modo no interactivo).
 - Los matchers de `Edit` y `NotebookEdit` en una sesión real (sí se probaron `Write`, `Bash` y `PowerShell`).
@@ -229,7 +253,20 @@ No se usa nada instalado por OpenSpec. Permisos, para Bash y para PowerShell (es
 
 ## 3. Ciclo de iteración
 
-Vueltas reales de la fase 2, en orden. El recuento y el criterio de «terminado» de la fase de implementación son **PENDIENTES (fase 4)**.
+**Cómo se estructuró el trabajo con el agente.** En todas las fases el orden fue el mismo: leer y analizar sin modificar nada, decidir las ambigüedades (el agente propone opciones y una recomendación; decide la persona responsable), escribir la especificación y el plan, revisar con un agente independiente, escribir primero los tests y el oráculo y comprobar que fallan, implementar lo mínimo y verificar con `test`, `acceptance` y `check`. Cada commit y cada push se autorizó antes. El feedback que se pasó al agente en cada vuelta fue, según el caso: la salida de los tests, la salida del oráculo `acceptance`, la comparación con la ejecución anterior, el informe de `kivora-reviewer` y las correcciones del usuario sobre cifras y decisiones.
+
+| Fase | Vueltas registradas | Feedback principal | Criterio de «terminado» | Detalle |
+|---|---:|---|---|---|
+| 1 (KIV-100) | no se llevó tabla de vueltas | Verificación de cada afirmación con archivo y línea, o con el comando que la demuestra | `docs/analysis.md`, `CLAUDE.md` y la respuesta de KIV-100, sin cambios en `kivora/`, `sql/` ni `tests/` | `docs/analysis.md` y `docs/sessions/fase-1-sesion-claude.md` |
+| 2 (especificar y planificar KIV-101) | 15 | Errores de herramienta (127, 429), cifras corregidas por el usuario, 8 observaciones al plan y 5 incidencias contra los datos | Especificación y plan (borrador y revisión) commiteados sin tocar código; cifras contrastadas con `data/inbox/` | Esta sección, fase 2 |
+| 3 (configurar el agente) | no se llevó tabla de vueltas | Pruebas del hook, mutaciones del guard, sesión real aislada y spikes | 34 tests del hook en verde, 7 de 7 mutaciones detectadas, `claude doctor` sin errores | Sección 2.5 |
+| 4 (implementar KIV-101) | 7 | Salida de `run` frente a la spec, tests y mutaciones, `acceptance`, `check` y determinismo | `test`, `acceptance` y `check` en verde, determinismo, tests que fallan con el código roto | Esta sección, fase 4 |
+| 5 (KIV-102) | 6 | Informe del revisor sobre cada documento, tests y oráculo en rojo, comparación con la línea base | 51 tests, `acceptance` 28/28 y 21/21, `check`, 14 filas cambiadas, determinismo | Sección 5.4 |
+| 6 (revisión y cierre) | 7 | Informe de `kivora-reviewer` sobre el proyecto entero y verificación de cada documento antes de commitearlo | Ver la fase 6 más abajo | Esta sección, fase 6 |
+
+### Ciclo de iteración de la fase 2 (KIV-101: especificar y planificar)
+
+Vueltas reales, en orden.
 
 | # | Qué ocurrió | Feedback / causa | Resultado |
 |---|---|---|---|
@@ -256,7 +293,7 @@ Nota verificable: tras los errores de las vueltas 4 y 7, el contexto posterior (
 - **Cómo se obtuvo:** con `/export docs/sessions/fase-2-sesion-claude.md` de Claude Code, sin editar el resultado (288.930 bytes, 4.874 líneas, SHA-256 `278E5C99CED6C0F0C70AA1D082E83BE7046FBB37C99A3FFC202A8255BD528E84`).
 - **Qué cubre:** mensajes anteriores y posteriores al cambio de modelo de NVIDIA Nemotron a Claude Sonnet: el primer prompt de la sesión, los errores de la primera etapa, la retoma tras el 429 y el propio `/export`. El archivo no etiqueta el modelo de cada mensaje; solo su cabecera indica el modelo inicial. Los mensajes escritos por el usuario aparecen en él.
 - **Límites:** no es una transcripción completa sin recortes. El terminal recorta automáticamente algunas salidas de herramientas (89 marcadores `… +N lines`, que ocultan 1.861 líneas), varios errores figuran con la redacción del terminal y no con el texto original de la herramienta, y el mensaje de vuelta del subagente no aparece.
-- **Copia íntegra:** existe una copia de la transcripción JSONL de la sesión fuera del repositorio (`~/kivora-backups/`, SHA-256 `4DB513A0D31BD500650D086044EB3794FF1A3E62D21F7BC9D1345464693EB2D4`). **No se publica**: contiene metadatos internos, rutas y datos de las peticiones.
+- **Copia íntegra:** existe una copia de la transcripción JSONL de la sesión fuera del repositorio (en una carpeta local de copias, SHA-256 `4DB513A0D31BD500650D086044EB3794FF1A3E62D21F7BC9D1345464693EB2D4`). **No se publica**: contiene metadatos internos, rutas y datos de las peticiones.
 - **Privacidad:** una búsqueda por patrones (no una lectura línea a línea) no encontró credenciales ni claves. El export contiene rutas locales, el usuario de GitHub y nombres del material del curso, aceptados por el usuario.
 - **Alcance temporal:** el export termina antes del commit de esta evidencia y del tag `phase-2`.
 
@@ -275,6 +312,37 @@ Vueltas reales, en orden. Criterio de «terminado»: `tasks.py test`, `tasks.py 
 | 7 | El usuario aprobó RF-23 y pidió mantenerlo en la especificación y en la implementación | RF-23 queda como aprobado en `plan.md`, en el informe y en `spec.md` (que deja constancia de la aprobación) | Corrección documental; no cambia el código ni los resultados |
 
 Nota honesta: los 16 tests y las 28 comprobaciones de `acceptance` pasaron a la primera, sin ninguna vuelta de corrección de código. Por eso se añadió la comprobación por mutación (vuelta 4): un test que pasa a la primera solo es fiable si se demuestra que falla cuando la regla se rompe.
+
+### Ciclo de iteración de la fase 5 (KIV-102)
+
+Seis vueltas (impacto, especificación, plan, tests en rojo, `acceptance` en rojo e implementación), cada una con el feedback que se dio y su resultado, en la sección 5.4. Criterio de «terminado»: 51 tests, `acceptance` 28/28 y 21/21, `check` con código 0, comparación con la línea base (días 1 a 7 idénticos; con los 10 días cambian exactamente 14 filas) y determinismo. La implementación pasó a la primera, pero solo tras corregir antes tres tests marcados como rojos que pasaban con el código anterior y los tests de la primera versión que fallaban por un error propio (sección 5.3).
+
+### Ciclo de iteración de la fase 6 (revisión y cierre)
+
+Siete vueltas, sin cambios de código. Criterio de «terminado»: `test`, `acceptance` y `check` en verde, todas las rutas y comandos citados comprobados, cada cifra recalculada, el historial y los tags verificados, y cada documento revisado por la persona responsable antes de commitearlo.
+
+| # | Feedback que se dio | Qué cambió | Resultado |
+|---|---|---|---|
+| 1 | Línea base: `test`, `acceptance`, `run`, `check`, tests del guard, `settings.json` y ficheros versionados | Nada | 51 tests; `acceptance` 28/28 y 21/21; 34 tests del guard; ningún `.env`, `.jsonl`, `output/` ni base de datos versionados |
+| 2 | Revisión final con `kivora-reviewer` (solo lectura): código, pruebas, resultados, documentación, configuración del agente e historial | Nada | 9 hallazgos: 1 media-alta, 4 medias, 1 baja-media y 3 bajas; ninguno alto |
+| 3 | Decisión del usuario sobre cada hallazgo y redacción de `docs/review.md` | `docs/review.md` | Al verificarlo antes del commit se vio que tres hallazgos figuraban como «Hecho» sin estarlo: se corrigió. Commit `6c6a4e2` |
+| 4 | Verificación del README: 21 rutas y enlaces, comandos ejecutados y cifras de referencia contra la ejecución | `README.md` | Commit `85a49b2` |
+| 5 | Autorización expresa para tocar `CLAUDE.md` y comprobación de que las secciones de Git y de protecciones quedaban idénticas | `CLAUDE.md` | Commit `1a4d610` |
+| 6 | Comprobación de que el renombrado lo reconoce Git al 100 % y de que el SHA-256 de la sesión no cambia | `docs/sessions/fase-1-sesion-claude.md` (movida) | Commit `ac49701` |
+| 7 | Verificación de las cifras y evidencias de esta memoria | `docs/report.md` y `docs/review.md` | Commit de esta memoria (ver `git log`) |
+
+### Evidencia de sesión de las fases 1, 2, 4 y 5
+
+Las cuatro sesiones están en `docs/sessions/`, exportadas con `/export` y sin editar. El enunciado exige las de las fases 2, 4 y 5. En `/export` el terminal pliega las salidas de las herramientas («… +N lines», «ctrl+o to expand»): es el formato del propio export. Los resultados de cada paso están en los resúmenes de la conversación y en los commits.
+
+| Sesión | Bytes | SHA-256 | Salidas plegadas |
+|---|---:|---|---:|
+| `fase-1-sesion-claude.md` | 53.760 | `63AF9FA4D4BA953229FFDCC9E4C30B32741F47407B7E4CEFFC57E1AA1EA1075E` | 12 |
+| `fase-2-sesion-claude.md` | 288.930 | `278E5C99CED6C0F0C70AA1D082E83BE7046FBB37C99A3FFC202A8255BD528E84` | 87 |
+| `fase-4-sesion-claude.md` | 625.230 | `199A8B48043E96F721F949C8D3B94BF116DBE142EFC749CAAFDB034987CD325F` | 184 |
+| `fase-5-sesion-claude.md` | 306.642 | `EBCAF681B1647B93C45EC6BD3AEA9A00C32206276AC0A9D044BA1CC971677B8C` | 54 |
+
+Escaneo de la sesión de la fase 5 con un script de patrones (claves de Anthropic, tokens de GitHub, cabeceras Bearer, contraseñas, correos y rutas personales): no hay secretos; solo el correo `noreply@anthropic.com` de los trailers y rutas locales con el nombre de usuario del sistema operativo, que se dejan tal cual (decisión del usuario; `docs/review.md`, H8). La sesión de la fase 6 no es exigida por el enunciado.
 
 ---
 
@@ -318,6 +386,8 @@ Estado en la fase 4: cada requisito tiene escenario, control, test y comprobaci�
 - Determinismo: dos ejecuciones con `python -m kivora` dan los mismos SHA-256 en `daily_customer_metrics.csv`, `rejected.csv` y `quality_report.json`.
 - Mutaciones: 6 de 6 detectadas por los tests (sección 3).
 - Cifras verificadas de la salida: 115 filas cliente-día, 32 clientes, 156 ventas, 18.490,74 EUR bruto, 1.310,19 EUR devuelto en 29 devoluciones, 17.180,55 EUR neto, 3 rechazos y solo C-3 con anomalía (`K-10148`: 101,20 EUR devueltos sobre 92,00 EUR). Con fechas UTC habría 118 filas.
+
+**Trazabilidad de KIV-102 (fase 5).** Los requisitos RC-1 a RC-13 del nuevo formato de `refunds.json` están en la sección 5.5, cada uno con su escenario, su test de `tests/test_kiv102.py` y su comprobación de la segunda pasada de `acceptance`. Estado final del proyecto: 51 tests (4 heredados, 16 de KIV-101 y 31 de KIV-102), `acceptance` con 28 comprobaciones de KIV-101 y 21 de KIV-102, y `check` con código 0. Las lagunas de esta tabla siguen igual (RF-5 y RF-23 solo con datos sintéticos; RF-19 con `git status`); las dos mutaciones que solo detectan los tests unitarios y no `acceptance` (prioridad entre `refund_amount` y `amount`, y control C-6) están en `docs/review.md`, sección 3.
 
 ---
 
@@ -443,22 +513,58 @@ Errores propios, detectados y corregidos con verificación y no por suposición:
 - **Un test rojo no basta: hay que ver por qué falla.** Tres tests marcados como rojos en el plan pasaban con el código actual (lo vio el revisor al ejecutarlos) y varios tests de la primera versión fallaban por un error del propio test (la fecha del pedido); solo se vio al ejecutar y leer los mensajes de fallo.
 - **El guard cumple su función y tiene falsos positivos.** Bloqueó una orden legítima; la regla del proyecto (no eludir, pedir decisión) se respetó.
 
-### 5.7 Límites y pendiente
+### 5.7 Límites
 
-- La tabla «Historial de referencia» del encabezado llega hasta la fase 4 y no incluye los commits de la fase 5 (están en la sección 5.1). No se ha tocado en esta tarea.
-- La sesión de Claude Code de la fase 5 se exportará con `/export` durante el cierre de esta misma fase, **antes del tag `phase-5`** (no en la fase 6), y se guardará en `docs/sessions/`. Hoy todavía no está exportada.
-- Las evidencias de ejecución de las tareas 0 a 3 (línea base, salidas de los tests rojos y verdes y comparaciones) están en `C:\Users\Usuario\kivora-backups\` fuera del repositorio, y no se versionan.
-- El tag `phase-5` no está creado.
-- Las secciones 3 y 7 de esta memoria no se han ampliado con la fase 5 todavía.
+- La sesión de la fase 5 se exportó con `/export` durante el cierre de la fase, antes del tag `phase-5`, y está en `docs/sessions/fase-5-sesion-claude.md` (commit `23628be`; huella en la sección 3).
+- Las evidencias de ejecución de las tareas de la fase 5 (línea base, salidas de los tests rojos y verdes y comparaciones) están en una carpeta local de copias fuera del repositorio y no se versionan; lo que importa de ellas queda en los commits, en `docs/report.md` y en los documentos de `docs/specs/KIV-102/`.
+- El tag `phase-5` (`23628be`) está publicado en `origin`.
+- Riesgos que se asumen y se documentan en `docs/review.md`: `daily_sales.csv` y `top_customers.csv` no cumplen del todo su contrato (H1), y algunas entradas malformadas, como un `refunds.json` de 0 bytes, hacen terminar el pipeline con error (H6).
 
 ---
 
 ## 6. Revisión
 
-**PENDIENTE (fase 6).** `docs/review.md` no existe. La revisión realizada en la fase 2 es la del plan (sección 1.3 y `plan.md`, sección 8), aportada por el usuario; no sustituye a la revisión con un revisor independiente exigida en la fase 6.
+El detalle completo, con la evidencia y la justificación de cada decisión, está en [`docs/review.md`](review.md). Aquí se resume.
+
+**Revisor.** Subagente `kivora-reviewer`, de solo lectura y con un contexto distinto del de la sesión que escribió el código y los documentos (es el revisor independiente que exige el enunciado en la fase 6). Revisó el código, las pruebas, los resultados, la documentación, la configuración del agente, el historial y el cumplimiento del enunciado sobre el estado `23628be` (tag `phase-5`). Ejecutó el pipeline, las mutaciones y las pruebas de robustez sobre copias fuera del repositorio y no modificó nada (`git status` vacío). Resultado: **9 hallazgos** (1 media-alta, 4 medias, 1 baja-media y 3 bajas; ninguno alto).
+
+| Id | Gravedad | Hallazgo | Decisión del usuario | Estado |
+|---|---|---|---|---|
+| H1 | Media-alta | `daily_sales.csv` y `top_customers.csv` no cumplen del todo su contrato (sin conversión a EUR, fecha UTC, sin última versión, joins que multiplican): 231 pedidos y 27.032,34 frente a 213 ventas y 25.072,41 € | **Rechazado el cambio de código; riesgo documentado.** Ningún ticket lo pide, lo consume otro equipo y ya estaba comunicado desde KIV-100 y KIV-101 | Documentado |
+| H2 | Media | 4 commits de la fase 1 sin `Co-Authored-By` (anteriores a la regla de `3a438a5`) | **Aceptado como riesgo, sin reescribir el historial** (prohibido por el enunciado) | Documentado |
+| H3 | Media | Esta memoria estaba desfasada (tags, estado, versión, historial, secciones 3, 6 y 7) | Aceptado | Hecho en esta versión |
+| H4 | Media | README sin actualizar | Aceptado | Hecho (`85a49b2`) |
+| H5 | Media | `CLAUDE.md` sin `acceptance`, devoluciones ni formatos de `refunds.json` | Aceptado | Hecho (`1a4d610`) |
+| H6 | Baja-media | Entradas fuera de los datos actuales hacen fallar el pipeline (`refunds.json` de 0 bytes, CSV con BOM, `--inbox` inexistente) o agrupan devoluciones sin `refund_id` | **Rechazado el cambio de código; riesgo documentado.** Están fuera del «mismo tipo de problemas» del enunciado y el conjunto de motivos de `rejected.csv` es cerrado | Documentado |
+| H7 | Baja | La sesión de la fase 1 estaba en `docs/sesiones/` y las demás en `docs/sessions/` | Aceptado | Hecho (`ac49701`) |
+| H8 | Baja | Ruta personal en esta memoria y rutas del usuario de Windows en las sesiones | Aceptado en parte: se quita de la memoria; **las sesiones no se editan** | Hecho en esta versión |
+| H9 | Baja | La respuesta de KIV-101 cita 20 pruebas y 28 comprobaciones (hoy 51 y 49) | **Rechazado el cambio:** son cifras históricas de la fase 4, y se aclara su fase en `docs/review.md` | Documentado |
+
+**Lo que el revisor comprobó como correcto.** Todas las cifras de los tickets y de esta memoria, con un cálculo independiente en Python con `Decimal`. Los 7 casos que exige el enunciado tienen un test que falla con el código roto (mutaciones reales: sin deduplicar, sin `UNKNOWN`, devoluciones que no acumulan, pedido inexistente sin rechazar, neto que ignora devoluciones, joins que multiplican, `ROUND_HALF_EVEN`, `float`, un solo formato de `refunds.json` y otras), con dos excepciones que solo detectan los tests unitarios y no `acceptance` (la prioridad entre `refund_amount` y `amount`, y el control C-6). También comprobó la robustez ante otras fechas, cambios de hora, un día sin ficheros y campos vacíos; el determinismo; los tags y el orden de las fases; que `data/inbox/` y `deliveries/` son iguales a las entregas; y la configuración del agente (el hook bloqueó una orden de prueba). No pudo verificar `claude doctor`, línea por línea los miles de líneas de documentos y sesiones, qué mide el script automático de corrección ni la atribución de los commits de la fase 1 (`docs/review.md`, sección 4).
+
+**Revisiones anteriores con el mismo revisor** (sección 5 de `docs/review.md`):
+
+| Revisión | Hallazgos | Efecto |
+|---|---|---|
+| Plan de KIV-101, fase 2 | 5 incidencias de cifras (sección 1.4) | Corregidas en `spec.md`, `plan.md` y esta memoria |
+| `spec.md` y `plan.md` de KIV-101, fase 4 | Un caso no previsto que dio lugar a RF-23 | Incorporado antes del código |
+| `impact.md`, `spec.md` y `plan.md` de KIV-102 | 1 media y 6 bajas; 5 medias y 3 bajas; 13 cambios (tres tests en rojo que pasaban) | Aplicados antes de commitear cada documento (sección 5.3) |
+| Código y memoria de KIV-102 | 0 altos y 0 medios; 2 bajos | Sin cambios necesarios |
+
+Los hallazgos se aplicaron o se rechazaron con motivo, y lo aceptado se corrigió en commits propios de la fase 6 (`85a49b2`, `1a4d610`, `ac49701` y esta memoria).
 
 ---
 
 ## 7. Qué harías distinto
 
-**PENDIENTE.** Se redactará al cerrar la práctica, con la experiencia de las fases 3 a 6.
+Cada punto parte de un hecho que consta en el repositorio.
+
+1. **Fijar las reglas de Git antes del primer commit.** Los 4 commits de la fase 1 no llevan `Co-Authored-By` porque la regla se estableció después (`3a438a5`) y no se puede reescribir el historial (H2). Pondría el trailer, el idioma de los mensajes y las reglas de commits en `CLAUDE.md` el primer día.
+2. **Abrir el cambio de `daily_sales` como ticket propio al cerrar KIV-100.** El análisis de la fase 1 ya había documentado sus defectos y se llegó a la revisión final con el riesgo abierto (H1). Habría pedido entonces la decisión a Dirección Comercial, en lugar de arrastrar una limitación conocida durante cuatro fases.
+3. **Ver por qué falla cada test rojo antes de darlo por bueno.** En la fase 5 tres tests marcados como rojos en el plan pasaban con el código actual, y varios tests de la primera versión fallaban por un error propio y no por el motivo esperado (secciones 5.3 y 5.6). Ejecutaría y leería los mensajes de fallo antes de etiquetarlos.
+4. **Actualizar la memoria al cerrar cada fase, con una lista de comprobación.** La revisión final encontró referencias obsoletas (tags «todavía no creados», estados «pendiente de commit», secciones 3, 6 y 7 sin completar; H3). Al cerrar cada fase repasaría la cabecera, la tabla de historial, los estados y las referencias cruzadas.
+5. **Decidir en la especificación qué hacer con entradas malformadas.** Un `refunds.json` vacío o un CSV con BOM hacen fallar el pipeline (H6). Habría añadido un escenario de «fichero vacío o malformado» a la especificación de KIV-101 y decidido entonces si se tolera o se informa.
+6. **Afinar el guard para distinguir mencionar de escribir.** La regla R1 bloqueó órdenes legítimas en las fases 5 y 6 porque nombraban `data/inbox` mientras escribían un documento (sección 2.7). No había riesgo para los datos, pero obligó a parar y pedir una decisión. Añadiría una prueba de ese caso al guard.
+7. **Mantener fuera de los documentos las rutas con el nombre de usuario del sistema.** La memoria y las sesiones las contienen (H8). Las sesiones deben ir sin editar, pero la memoria no tendría que haberlas incluido.
+
+**Lo que mantendría.** Analizar el impacto antes de tocar código (en la fase 5 permitió dar las cifras de Finanzas antes de escribir una línea); los tests y el oráculo en rojo antes de implementar; un revisor independiente sobre cada documento antes de commitearlo (cada vez encontró algo que cambió lo escrito); y un guard que impone de forma determinista las reglas que antes había que repetir en cada prompt.

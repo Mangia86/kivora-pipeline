@@ -18,7 +18,7 @@ Gravedad según el revisor. Todos los hallazgos los encontró `kivora-reviewer`.
 | H4 | kivora-reviewer | Media | `README.md` sin actualizar | **Aceptado** | Es un entregable obligatorio de la fase 6 | Tarea 3 (README) |
 | H5 | kivora-reviewer | Media | `CLAUDE.md` sin `acceptance`, devoluciones, salidas de KIV-101 ni formatos de `refunds.json` | **Aceptado** | Un `CLAUDE.md` debe servir a una sesión nueva | Tarea 4 (`CLAUDE.md`, con confirmación expresa) |
 | H6 | kivora-reviewer | Baja-media | Casos límite de robustez fuera de los datos actuales: `refunds.json` vacío, CSV con BOM, `--inbox` inexistente, devoluciones sin `refund_id` | **Rechazado el cambio de código: se documenta el riesgo** | Ver §2.3 | Esta tabla y sección 6 de `docs/report.md` |
-| H7 | kivora-reviewer | Baja | La sesión de la fase 1 está en `docs/sesiones/` y las demás en `docs/sessions/` | **Aceptado** | Unificar evita problemas de mayúsculas entre sistemas | Tarea 5 (`git mv`) |
+| H7 | kivora-reviewer | Baja | La sesión de la fase 1 está en `docs/sesiones/` y las demás en `docs/sessions/` | **Aceptado** | Unificar evita problemas de mayúsculas entre sistemas | Tarea 5 (`git mv`), resuelto en `ac49701` |
 | H8 | kivora-reviewer | Baja | La memoria versiona la ruta de una carpeta local de copias que incluye el nombre de usuario de Windows; las sesiones contienen rutas con ese mismo usuario | **Aceptado en parte** | Ver §2.4 | Tarea 6 (memoria); las sesiones no se editan |
 | H9 | kivora-reviewer | Baja | La respuesta de `docs/tickets/KIV-101.md` dice «20 pruebas» y «28 comprobaciones», y hoy hay 51 y 49 | **Rechazado el cambio: se conservan las cifras históricas y se aclara su fase** | Ver §2.5 | Esta sección |
 
@@ -155,12 +155,12 @@ El mismo subagente revisó cada documento principal antes de commitearlo. Estas 
 
 | Hallazgo | Cambio | Archivo | Estado |
 |---|---|---|---|
-| H3 | Actualizar cabecera, estado, historial y referencias obsoletas | `docs/report.md` | Pendiente (tarea 6) |
-| H4 | Reescribir el README | `README.md` | Pendiente (tarea 3) |
-| H5 | Añadir `acceptance`, devoluciones, salidas de KIV-101 y formatos de `refunds.json` | `CLAUDE.md` | Pendiente (tarea 4, con confirmación expresa) |
-| H7 | Mover la sesión de la fase 1 a `docs/sessions/` | `docs/sesiones/fase-1-sesion-claude.md` | Pendiente (tarea 5) |
-| H8 | Quitar la ruta personal de la memoria; no editar las sesiones | `docs/report.md` | Pendiente (tarea 6) |
+| H3 | Actualizar cabecera, estado, historial y referencias obsoletas | `docs/report.md` | Hecho (tarea 6, memoria v1.0) |
+| H4 | Reescribir el README | `README.md` | Hecho (commit `85a49b2`) |
+| H5 | Añadir `acceptance`, devoluciones, salidas de KIV-101 y formatos de `refunds.json` | `CLAUDE.md` | Hecho (commit `1a4d610`, con confirmación expresa) |
+| H7 | Mover la sesión de la fase 1 a `docs/sessions/` | `docs/sesiones/fase-1-sesion-claude.md` | **Resuelto** (commit `ac49701`: `git mv`, renombrado al 100 %, SHA-256 idéntico) |
+| H8 | Quitar la ruta personal de la memoria; no editar las sesiones | `docs/report.md` | Hecho (tarea 6, memoria v1.0); las sesiones no se editaron |
 | H1, H2, H6, H9 | Documentados en este archivo; sin cambios de código, de historial ni del ticket | `docs/review.md` | Hecho en este documento |
-| H1, H2, H6 | Resumir los riesgos asumidos en la sección 6 de la memoria | `docs/report.md` | Pendiente (tarea 6) |
+| H1, H2, H6 | Resumir los riesgos asumidos en la sección 6 de la memoria | `docs/report.md` | Hecho (tarea 6, memoria v1.0: sección 6) |
 
 Fuera de esta revisión queda, por decisión expresa, no añadir `*.jsonl` a `.gitignore` (el hook del guard ya bloquea su commit).
