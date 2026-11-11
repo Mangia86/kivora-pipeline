@@ -55,7 +55,7 @@ def check(_):
 
 
 def acceptance(_):
-    """Acceptance of KIV-101: scenarios E-1..E-15 over data/inbox (exit code 0 only if all pass)."""
+    """Acceptance of KIV-101 (E-1..E-15, days up to 2026-09-07) and KIV-102 (every day of data/inbox); exit code 0 only if all pass."""
     return _module("kivora.acceptance")
 
 
