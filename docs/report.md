@@ -1,7 +1,7 @@
 # Memoria de la práctica · Pipeline Kivora
 
 **Versión:** 0.5, fase 4 (implementación de KIV-101) añadida sobre la 0.4 de la fase 3. La 0.1 se commiteó en `efe0bcc`, la 0.3 en `f37e4ee` y la 0.4 en `dcc4bbb`.
-**Estado:** documenta lo ocurrido hasta la fase 4 (implementación, pruebas y trazabilidad completas; pendiente de cerrar con el tag `phase-4`). Las secciones que dependen de las fases 5 y 6 están marcadas como **PENDIENTE** y no contienen resultados ni decisiones inventados.
+**Estado:** documenta lo ocurrido hasta la fase 5 (KIV-102: la sección 5 «Cambio de esquema» está completa; pendiente de cerrar con el tag `phase-5`). Las secciones que dependen de la fase 6 están marcadas como **PENDIENTE** y no contienen resultados ni decisiones inventados.
 
 **Historial de referencia (fases 2 a 4):**
 
@@ -323,7 +323,133 @@ Estado en la fase 4: cada requisito tiene escenario, control, test y comprobaci�
 
 ## 5. Cambio de esquema
 
-**PENDIENTE (fase 5).** Todavía no se ha recibido la entrega 2 ni el ticket KIV-102; no hay análisis de impacto.
+Ticket KIV-102: `refunds.json` cambia de formato desde el 2026-09-08 (`amount` pasa a `refund_amount` y aparece `reason`, que puede ser `null`) y los dos formatos conviven en `data/inbox/`. Documentos de la fase: `docs/specs/KIV-102/impact.md`, `spec.md` y `plan.md`; respuesta en `docs/tickets/KIV-102.md`.
+
+### 5.1 Cómo se analizó el impacto (antes del código)
+
+Orden real del historial (`git log phase-4..HEAD`), con el análisis antes de cualquier cambio de código:
+
+| Commit | Contenido |
+|---|---|
+| `9351756` | Entrega 2 (`tasks.py deliver 2`): 13 ficheros (3 días × 4 ficheros, más `docs/tickets/KIV-102.md`), en un commit propio |
+| `677fc96` | `docs/specs/KIV-102/impact.md` (**antes** de cualquier cambio de código) |
+| `4642b3b` | `docs/specs/KIV-102/spec.md` (RC-1 a RC-13, escenarios E-1 a E-12, decisiones A-1 a A-11) |
+| `a644c23` | `docs/specs/KIV-102/plan.md`, con «Revisión del plan» |
+| `ce57809` | `tests/test_kiv102.py`: 31 tests, 21 en rojo con el código de la fase 4 y 10 de guarda |
+| `3f3cdbe` | `kivora/acceptance.py` con segunda pasada para KIV-102 (en rojo: 3/21) y ayuda de `acceptance` en `tasks.py` |
+| `c978007` | `kivora/ingest.py`: lectura de los dos formatos (único cambio de código de producción) |
+| `da786bf` | `docs/sources.md`: sección de `refunds.json` en sus dos formatos (no existía) |
+| `b7b7124` | Respuesta en `docs/tickets/KIV-102.md` |
+
+Método del análisis (`impact.md`), sin modificar nada del repositorio:
+
+1. Se leyó el ticket, el código afectado, los contratos y los tests.
+2. Se ejecutó el pipeline actual sobre los 10 días, con la salida fuera del repositorio, y se compararon los resultados con los de solo los días 01 a 07.
+3. Se simuló la solución sobre una **copia** de los datos (renombrando `refund_amount` a `amount`) únicamente para **medir** el efecto esperado. No fue la implementación.
+4. Se enumeraron los archivos afectados, los riesgos de regresión y las ambigüedades, sin inventar requisitos.
+
+Lo que reveló (cifras reproducidas por `kivora-reviewer`):
+
+| Medida | Con el código de la fase 4 | Con soporte del formato nuevo |
+|---|---:|---:|
+| Devoluciones nuevas recibidas (días 08 a 10) | 15 | 15 |
+| Rechazadas como `importe no valido` | **14** | 0 |
+| Registros en `rejected.csv` | 18 | 4 |
+| Filas de `daily_customer_metrics.csv` que cambian | — | 14 (12 de días 01 a 07 y 2 de los días 08 y 09) |
+| Controles de calidad con anomalía | solo C-3 (`K-10148`) | C-2 = 1 (`C026`, neto −10,00 €) y C-3 = 2 (`K-10148` y `K-10155`) |
+| Código de salida del pipeline | 0 | 0 |
+
+Hallazgo principal: **el fallo era silencioso**. El pipeline terminaba bien y solo el número de rechazados (de 3 a 18) delataba que se perdían 14 de las 15 devoluciones nuevas. Matiz importante: con el código anterior el control C-3 **ya señalaba una anomalía**, pero era la preexistente de KIV-101 (`K-10148`) y no tenía relación con el cambio de formato. **Ningún control detectaba las 14 devoluciones perdidas**: ni los seis controles de `quality_report.json` ni el código de salida lo reflejaban. `daily_sales.csv` y `top_customers.csv` no dependen de las devoluciones y no cambian (comprobado byte a byte).
+
+### 5.2 Decisiones con el agente (spec KIV-102, A-1 a A-11)
+
+El agente propuso las opciones y una decisión justificada para cada ambigüedad; la persona responsable las revisó y las aprobó o las cambió:
+
+| Decisión | Origen | Resultado |
+|---|---|---|
+| A-1: con `amount` y `refund_amount` a la vez manda `refund_amount` | Propuesta del agente, aprobada | Regla defensiva, no ocurre en los datos |
+| A-2: sin importe, `null` o vacío → `importe no valido`, no 0 | Preserva RF-23 de KIV-101 | Aprobada |
+| A-3: `reason` solo en `raw_refunds`, ninguna salida lo publica | Propuesta del agente, aprobada | Es texto libre y puede contener datos personales |
+| A-4: `reason` ausente, `null` o vacío no rechaza | Del ticket («puede venir a `null`») | Aprobada |
+| A-5: el formato se decide por registro, no por fichero | Propuesta del agente, aprobada | |
+| A-6, A-7: neto negativo informado; devoluciones al día de compra | Preservan RF-17 y RF-11 de KIV-101 | Aprobadas |
+| A-8: `acceptance` con segunda pasada sobre los 10 días | Propuesta del agente, aprobada | |
+| A-9: importe número o texto numérico | Del ticket y de `parse_float=str` | Aprobada |
+| A-10: importes cero o negativos | **El agente propuso rechazarlos; la persona responsable no lo autorizó.** KIV-101 solo rechaza importes ausentes o no numéricos, y no había requisito explícito | Se conserva el comportamiento anterior; el test `test_zero_and_negative_amounts_keep_the_current_behaviour` lo fija |
+| A-11: moneda ausente, `refund_id`/`order_id` ausentes, `refunded_at` | Preserva KIV-101 | Sin cambios |
+
+La decisión A-10 es el ejemplo claro de delegar y decidir: el agente detectó un hueco real y propuso una regla; la persona responsable comprobó primero qué establecía KIV-101 y decidió no introducir una regla nueva sin requisito.
+
+### 5.3 Revisión con un agente independiente (`kivora-reviewer`, solo lectura)
+
+Cada documento se revisó antes de commitearlo. El revisor ejecutó el pipeline sobre copias fuera del repositorio y reprodujo las cifras:
+
+| Documento | Hallazgos | Qué se cambió |
+|---|---|---|
+| `impact.md` | 1 media y 6 bajas | Desfase de la spec de KIV-101 (C-2/C-3) declarado; `docs/sources.md` pasó de «desactualizado» a «sin documentar»; dirección del error en las cifras de Finanzas; líneas de código citadas |
+| `spec.md` | 5 medias y 3 bajas | RC-7 hablaba de «ninguna cabecera con `reason`» y `rejected.csv` tiene una columna `reason` (el motivo de rechazo): se reformuló para el **valor** del campo; RC-4 apuntaba a un escenario equivocado; faltaba indicar dónde se verifica cada escenario; el caso de los importes cero o negativos (A-10) |
+| `plan.md` | 13 cambios (ver `plan.md`, sección 6) | **Tres tests marcados como rojos pasaban con el código actual** (el revisor los ejecutó): se reetiquetaron o se les añadieron aserciones; una frase errónea sobre los días 01 a 07; faltaba la tarea del commit del plan (regla R4 del guard) |
+
+Errores propios, detectados y corregidos con verificación y no por suposición:
+
+- Los primeros tests de `tests/test_kiv102.py` usaban una fecha de pedido equivocada. Fallaban en rojo, pero por una razón distinta de la esperada (`NoneType`). Se detectó al leer los **mensajes** de fallo de los 21 rojos, no solo al contarlos, y se corrigió antes del commit.
+- Un test que yo había clasificado como guarda (`test_real_data_only_late_refunds_change_days_01_to_07`) en realidad dependía del cambio: se movió a los rojos.
+- En la respuesta del ticket redacté una petición a Plataforma que el ticket no contempla. Se eliminó antes de commitear.
+- El guard (`kivora_guard`, regla R1) bloqueó un script mío que escribía un documento y mencionaba `data/inbox`. Era un falso positivo; no se esquivó con otra orden: se pidió la decisión a la persona responsable y se aplicaron los cambios con la herramienta de edición.
+
+### 5.4 Ciclo de la fase 5
+
+| Vuelta | Feedback | Resultado |
+|---|---|---|
+| Impacto | Revisión de `kivora-reviewer` | 7 correcciones en `impact.md`; commit `677fc96` |
+| Spec | Revisión + decisión sobre A-10 | 5 medias y 3 bajas aplicadas, A-10 sin cambio; commit `4642b3b` |
+| Plan | Revisión (el revisor ejecutó los tests propuestos) | 13 cambios; commit `a644c23` |
+| Tests en rojo | Salida de `pytest` con el código de la fase 4 | 21 rojos y 10 verdes; corregidas las fechas de tres tests; commit `ce57809` |
+| Acceptance en rojo | `tasks.py acceptance` con el código actual | KIV-101 28/28 y KIV-102 3/21; contrastado con la simulación (21/21); commit `3f3cdbe` |
+| Implementación | Los 31 tests, `acceptance`, `check` y comparación con la línea base | Todo en verde a la primera; commit `c978007` |
+
+**Criterio para dar la fase por terminada:** `tasks.py test` en verde (51 pruebas: 20 de antes y 31 nuevas), `tasks.py acceptance` en verde en las dos pasadas (28/28 de KIV-101 y 21/21 de KIV-102), `tasks.py check` con código 0, los tests del guard (34) en verde, y la comparación con la línea base de la tarea 0:
+
+- Días 01 a 07: los cinco ficheros salen idénticos byte a byte.
+- Días 01 a 10: cambian exactamente 14 filas de `daily_customer_metrics.csv`; `daily_sales.csv` y `top_customers.csv` salen idénticos; dos ejecuciones dan ficheros idénticos.
+- Rechazos: 4 (`R-1003`, `R-1005`, `R-1006` y `R-1034`), ninguno por `importe no valido`.
+- El texto de `reason` no aparece en ninguna salida.
+
+### 5.5 Trazabilidad de KIV-102
+
+| Requisito | Escenario | Test (`tests/test_kiv102.py`) | `acceptance` (segunda pasada) |
+|---|---|---|---|
+| RC-1: leer `refund_amount` | E-1 a E-3, E-5, E-8 | `test_refund_amount_is_counted`, `test_refund_amount_converts_currency`, `test_late_refund_restates_the_purchase_day`, `test_real_data_new_refunds_change_exactly_14_rows` | las 14 filas con sus cuatro cifras |
+| RC-2: el formato anterior no cambia | E-6 | `test_old_format_unchanged`, `test_real_data_old_format_days_01_to_07_unchanged`, `test_real_data_only_late_refunds_change_days_01_to_07` y los 20 tests anteriores | las 28 comprobaciones de la primera pasada |
+| RC-3: formatos mezclados | E-4 | `test_both_formats_on_same_order`, `test_formats_mixed_in_same_file` | `C026 / 2026-09-06` |
+| RC-4: manda `refund_amount` | E-9 | `test_refund_amount_wins_when_both_present` | — (caso sintético) |
+| RC-5: importe ausente, `null` o vacío | E-9 | `test_refund_amount_used_when_amount_is_blank`, `test_null_or_blank_refund_amount_falls_back_to_amount`, `test_record_without_any_amount_is_rejected` | — (caso sintético) |
+| RC-6: `reason` opcional | E-1, E-10 | `test_reason_null_blank_absent_or_text_is_accepted` (6 variantes) | `R-1033` (`reason = null`) no está en `rejected.csv` |
+| RC-7: `reason` solo en `raw_refunds` | E-10 | `test_reason_is_kept_only_in_raw_refunds`, `test_real_data_reason_is_stored_in_raw_refunds` | — |
+| RC-8: campos desconocidos | E-11 | `test_unknown_fields_are_ignored` | — (caso sintético) |
+| RC-9: ningún `importe no valido` por el formato | E-7 | `test_real_data_rejections_and_controls` | `rejected.csv` exacto y ningún `importe no valido` |
+| RC-10: controles de calidad | E-5, E-7 | `test_quality_controls_see_new_format`, `test_new_refunds_do_not_duplicate_rows`, `test_real_data_rejections_and_controls` | C-2 = 1 y C-3 = 2 |
+| RC-11: contrato y determinismo | E-12 | `test_output_is_deterministic_with_both_formats`, `test_sales_outputs_do_not_depend_on_refunds` | dos ejecuciones idénticas; 164 filas únicas |
+| RC-12: `acceptance` ampliado | — | — | `tasks.py acceptance`, código 0 |
+| RC-13: `data/inbox/` y `deliveries/` intactos | — | `git status` sin cambios en esas carpetas | — |
+
+**Qué demuestran los tests.** 21 de los 31 tests nuevos fallaban con el código de la fase 4 y pasan con el nuevo; los 10 restantes protegen comportamiento existente (formato anterior, rechazo sin importe, campos desconocidos, importes cero y negativos, independencia de `daily_sales`) y pasaban antes y después.
+
+### 5.6 Qué se aprendió
+
+- **Un cambio de formato falla en silencio.** Los controles de KIV-101 miden la coherencia de lo que se calcula, no que se calcule todo lo que llega. Por eso se añadió a `acceptance` la comprobación del número exacto de rechazados y de las filas afectadas.
+- **Medir antes de decidir.** Simular la solución sobre una copia dio las cifras de Finanzas (14 filas, 12 de ellas de días ya entregados) antes de escribir una línea de código.
+- **Las devoluciones tardías revisan el pasado.** Al atribuirlas al día de compra, las cifras de los días 1 a 7 de Finanzas pasan de 1.310,19 € a 1.591,15 € devueltos. Es una consecuencia de una regla ya aprobada y se explica en la respuesta del ticket.
+- **Un test rojo no basta: hay que ver por qué falla.** Tres tests marcados como rojos en el plan pasaban con el código actual (lo vio el revisor al ejecutarlos) y varios tests de la primera versión fallaban por un error del propio test (la fecha del pedido); solo se vio al ejecutar y leer los mensajes de fallo.
+- **El guard cumple su función y tiene falsos positivos.** Bloqueó una orden legítima; la regla del proyecto (no eludir, pedir decisión) se respetó.
+
+### 5.7 Límites y pendiente
+
+- La tabla «Historial de referencia» del encabezado llega hasta la fase 4 y no incluye los commits de la fase 5 (están en la sección 5.1). No se ha tocado en esta tarea.
+- La sesión de Claude Code de la fase 5 se exportará con `/export` durante el cierre de esta misma fase, **antes del tag `phase-5`** (no en la fase 6), y se guardará en `docs/sessions/`. Hoy todavía no está exportada.
+- Las evidencias de ejecución de las tareas 0 a 3 (línea base, salidas de los tests rojos y verdes y comparaciones) están en `C:\Users\Usuario\kivora-backups\` fuera del repositorio, y no se versionan.
+- El tag `phase-5` no está creado.
+- Las secciones 3 y 7 de esta memoria no se han ampliado con la fase 5 todavía.
 
 ---
 
