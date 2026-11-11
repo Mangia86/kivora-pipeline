@@ -8,7 +8,7 @@
 
 ## 1. Tabla de hallazgos
 
-Gravedad según el revisor. Todos los hallazgos los encontró `kivora-reviewer`.
+Gravedad según el revisor. Los hallazgos H1 a H9 los encontró `kivora-reviewer`. **H10 lo detectó después el agente de la sesión, al verificar el cierre de la fase 6** (revisando el reflog), y no lo vio el revisor.
 
 | Id | Encontrado por | Gravedad | Hallazgo | Decisión | Motivo | Dónde se resuelve |
 |---|---|---|---|---|---|---|
@@ -21,6 +21,7 @@ Gravedad según el revisor. Todos los hallazgos los encontró `kivora-reviewer`.
 | H7 | kivora-reviewer | Baja | La sesión de la fase 1 está en `docs/sesiones/` y las demás en `docs/sessions/` | **Aceptado** | Unificar evita problemas de mayúsculas entre sistemas | Tarea 5 (`git mv`), resuelto en `ac49701` |
 | H8 | kivora-reviewer | Baja | La memoria versiona la ruta de una carpeta local de copias que incluye el nombre de usuario de Windows; las sesiones contienen rutas con ese mismo usuario | **Aceptado en parte** | Ver §2.4 | Tarea 6 (memoria); las sesiones no se editan |
 | H9 | kivora-reviewer | Baja | La respuesta de `docs/tickets/KIV-101.md` dice «20 pruebas» y «28 comprobaciones», y hoy hay 51 y 49 | **Rechazado el cambio: se conservan las cifras históricas y se aclara su fase** | Ver §2.5 | Esta sección |
+| H10 | Agente de la sesión (verificación de cierre, reflog) | Media | En la fase 1 se hizo un `commit --amend` sobre un commit que ya estaba en `origin` (`38e412b` pasó a `4e5b067`) y se reconcilió con un merge (`f8df7c9`) | **Aceptado como riesgo: se documenta, sin reescribir el historial** | Ver §2.6 | Esta tabla y secciones 6 y 7 de `docs/report.md` |
 
 ## 2. Detalle, evidencia y justificación
 
@@ -113,6 +114,33 @@ Funcionan sin fallos: otras fechas (incluidos los cambios de hora de 2027), un d
 
 **Justificación:** la respuesta a Finanzas es un documento fechado de la fase 4 y esas cifras eran verdaderas entonces. Las cifras actuales están en `docs/tickets/KIV-102.md` y en la sección 5 de `docs/report.md`. Reescribir una respuesta histórica borraría la trazabilidad de cada fase.
 
+### 2.6 H10 · `amend` de la fase 1 sobre un commit ya publicado (media)
+
+**Cómo se detectó.** No lo encontró `kivora-reviewer`. Lo detectó el agente de la sesión al verificar el cierre de la fase 6: el reflog local tiene una entrada `commit (amend)`, y `git log` muestra el único merge del repositorio (el que ya cita H2).
+
+**Evidencia** (`git reflog` y `git log`, hora local del 2026-11-05):
+
+| Hora | Commit | Qué ocurrió |
+|---|---|---|
+| 20:28 | `38e412b` | `commit: Phase 1: analyze pipeline and document KIV-100` (mensaje en inglés) |
+| 20:28 | `4e5b067` | `commit (amend): Fase 1: análisis del pipeline y documentación de KIV-100` (mismo contenido, mensaje en español) |
+| 20:41 | `4d88adb` | `Documentar sesión de Claude Code de la fase 1` (tag `phase-1`) |
+| 20:44 | `f8df7c9` | `merge origin/master: Merge made by the 'ours' strategy`. Padres: `4d88adb` y `38e412b` |
+| 20:59 | `3a438a5` | **Primer commit con las reglas de Git de `CLAUDE.md`** |
+
+El `38e412b` original ya estaba en `origin/master` (el merge se hizo contra `origin/master`). Hoy **los dos commits, `38e412b` y `4e5b067`, son alcanzables desde `origin/master`**, es decir, no se ha eliminado ningún commit publicado. Desde `3a438a5` hasta hoy el reflog no contiene ningún otro `amend`, `rebase` ni `reset`.
+
+**Decisión: aceptado como riesgo. Se documenta y no se reescribe el historial.**
+
+**Justificación:**
+
+1. **Ocurrió antes de establecer las reglas de Git.** El `amend` es de las 20:28 y las reglas que prohíben reescribir el historial (`3a438a5`) son de las 20:59, en la fase 2. No incumple una regla que todavía no existía, aunque sí es lo que esas reglas evitan después.
+2. **El historial se reconcilió, no se reescribió después.** La divergencia entre el commit publicado y el corregido se resolvió con un commit de integración (`f8df7c9`). No se ha eliminado ningún commit publicado y la historia de `origin` se conserva entera. Por eso conviven en el historial el commit en inglés y el corregido en español.
+3. **No se va a reescribir.** El enunciado (§3.4) y `CLAUDE.md` prohíben reescribir la historia (`amend`, `rebase` y push forzado), y `phase-1` ya está publicado. Deshacerlo exigiría reescribir, que es peor que dejarlo documentado.
+4. **Relación con H2.** Los mismos cuatro commits de la fase 1 (`38e412b`, `4e5b067`, `4d88adb` y `f8df7c9`) son los que no llevan `Co-Authored-By`: tienen la misma causa, que la fase 1 es anterior a las reglas.
+
+**Límite de la evidencia.** El reflog es local de este clon: confirma el `amend` y la fecha, pero no puede demostrar por sí solo que nunca hubo un empuje forzado. Lo que sí se comprueba es que los dos commits siguen en `origin/master`.
+
 ## 3. Lo que el revisor verificó como correcto
 
 - **Cifras:** todas las de los tickets KIV-101 y KIV-102 y de `docs/report.md`, con un cálculo independiente en Python con `Decimal`, sin reutilizar el código del repositorio:
@@ -149,7 +177,7 @@ El mismo subagente revisó cada documento principal antes de commitearlo. Estas 
 | `spec.md` de KIV-102 | 5 medias y 3 bajas | Aplicadas, salvo una regla sobre importes cero o negativos que no se autorizó (A-10) (commit `4642b3b`) |
 | `plan.md` de KIV-102 | 13 cambios, entre ellos tres tests marcados como rojos que pasaban con el código actual | Aplicados antes de commitear (commit `a644c23`) |
 | Código y memoria de KIV-102 (fase 5) | 0 altas y 0 medias; 2 bajas | Sin cambios necesarios: un caso límite coherente con la spec y una etiqueta cosmética de `acceptance` |
-| **Revisión final del proyecto (esta)** | 9 hallazgos, de los cuales 1 media-alta, 4 medias, 1 baja-media y 3 bajas | Ver §1 |
+| **Revisión final del proyecto (esta)** | 9 hallazgos del revisor (1 media-alta, 4 medias, 1 baja-media y 3 bajas) y 1 más (H10, media) detectado en la verificación de cierre | Ver §1 |
 
 ## 6. Estado de aplicación de los cambios aceptados
 
@@ -160,7 +188,8 @@ El mismo subagente revisó cada documento principal antes de commitearlo. Estas 
 | H5 | Añadir `acceptance`, devoluciones, salidas de KIV-101 y formatos de `refunds.json` | `CLAUDE.md` | Hecho (commit `1a4d610`, con confirmación expresa) |
 | H7 | Mover la sesión de la fase 1 a `docs/sessions/` | `docs/sesiones/fase-1-sesion-claude.md` | **Resuelto** (commit `ac49701`: `git mv`, renombrado al 100 %, SHA-256 idéntico) |
 | H8 | Quitar la ruta personal de la memoria; no editar las sesiones | `docs/report.md` | Hecho (tarea 6, memoria v1.0); las sesiones no se editaron |
-| H1, H2, H6, H9 | Documentados en este archivo; sin cambios de código, de historial ni del ticket | `docs/review.md` | Hecho en este documento |
+| H1, H2, H6, H9, H10 | Documentados en este archivo; sin cambios de código, de historial ni del ticket | `docs/review.md` | Hecho en este documento |
 | H1, H2, H6 | Resumir los riesgos asumidos en la sección 6 de la memoria | `docs/report.md` | Hecho (tarea 6, memoria v1.0: sección 6) |
+| H10 | Referencia en las secciones 6 y 7 de la memoria | `docs/report.md` | Hecho (cierre de la fase 6) |
 
 Fuera de esta revisión queda, por decisión expresa, no añadir `*.jsonl` a `.gitignore` (el hook del guard ya bloquea su commit).
