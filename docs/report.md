@@ -33,7 +33,10 @@
 | `6c6a4e2` | Fase 6: `docs/review.md`, revisión final con `kivora-reviewer` |
 | `85a49b2`, `1a4d610` | Fase 6: `README.md` y `CLAUDE.md` actualizados |
 | `ac49701` | Fase 6: la sesión de la fase 1 pasa a `docs/sessions/` (`git mv`, renombrado al 100 %) |
-| *(commit de esta memoria, ver `git log`)* | Fase 6: secciones 3, 6 y 7 completas, referencias obsoletas corregidas e historial actualizado |
+| `d610b9b` | Fase 6: memoria v1.0 (secciones 3, 6 y 7 completas, referencias obsoletas corregidas e historial actualizado) y estado de los hallazgos en `docs/review.md` |
+| `7a09246` | Fase 6: hallazgo H10 (el `amend` de la fase 1) en `docs/review.md` y referencia en las secciones 6 y 7 |
+| `b681fcc` | Fase 6: sesión exportada, `docs/sessions/fase-6-sesion-claude.md` |
+| *(commit de esta actualización, ver `git log`)* | Fase 6: la sesión de la fase 6 en la tabla de sesiones de la sección 3 |
 
 **Tags** (de `phase-2` a `phase-5` anotados; `phase-1` es ligero; todos publicados en `origin`): `phase-1` → `4d88adb`, `phase-2` → `ad71b5a`, `phase-3` → `dcc4bbb`, `phase-4` → `20a6816`, `phase-5` → `23628be`. `phase-6` se crea al cerrar la fase.
 
@@ -331,9 +334,9 @@ Siete vueltas, sin cambios de código. Criterio de «terminado»: `test`, `accep
 | 6 | Comprobación de que el renombrado lo reconoce Git al 100 % y de que el SHA-256 de la sesión no cambia | `docs/sessions/fase-1-sesion-claude.md` (movida) | Commit `ac49701` |
 | 7 | Verificación de las cifras y evidencias de esta memoria | `docs/report.md` y `docs/review.md` | Commit de esta memoria (ver `git log`) |
 
-### Evidencia de sesión de las fases 1, 2, 4 y 5
+### Evidencia de sesión de las fases 1, 2, 4, 5 y 6
 
-Las cuatro sesiones están en `docs/sessions/`, exportadas con `/export` y sin editar. El enunciado exige las de las fases 2, 4 y 5. En `/export` el terminal pliega las salidas de las herramientas («… +N lines», «ctrl+o to expand»): es el formato del propio export. Los resultados de cada paso están en los resúmenes de la conversación y en los commits.
+Las cinco sesiones están en `docs/sessions/`, exportadas con `/export` y sin editar. El enunciado exige las de las fases 2, 4 y 5. En `/export` el terminal pliega las salidas de las herramientas («… +N lines», «ctrl+o to expand»): es el formato del propio export. Los resultados de cada paso están en los resúmenes de la conversación y en los commits.
 
 | Sesión | Bytes | SHA-256 | Salidas plegadas |
 |---|---:|---|---:|
@@ -341,8 +344,11 @@ Las cuatro sesiones están en `docs/sessions/`, exportadas con `/export` y sin e
 | `fase-2-sesion-claude.md` | 288.930 | `278E5C99CED6C0F0C70AA1D082E83BE7046FBB37C99A3FFC202A8255BD528E84` | 87 |
 | `fase-4-sesion-claude.md` | 625.230 | `199A8B48043E96F721F949C8D3B94BF116DBE142EFC749CAAFDB034987CD325F` | 184 |
 | `fase-5-sesion-claude.md` | 306.642 | `EBCAF681B1647B93C45EC6BD3AEA9A00C32206276AC0A9D044BA1CC971677B8C` | 54 |
+| `fase-6-sesion-claude.md` | 519.988 | `AFE8BB0678EB7A93C100CF8A1F709CAC9EB40A3B002739A54F8747FBAA798A7B` | 95 |
 
-Escaneo de la sesión de la fase 5 con un script de patrones (claves de Anthropic, tokens de GitHub, cabeceras Bearer, contraseñas, correos y rutas personales): no hay secretos; solo el correo `noreply@anthropic.com` de los trailers y rutas locales con el nombre de usuario del sistema operativo, que se dejan tal cual (decisión del usuario; `docs/review.md`, H8). La sesión de la fase 6 no es exigida por el enunciado.
+**La exportación de la fase 6 es acumulativa e incluye parte de la fase 5.** Las fases 5 y 6 se trabajaron en una única conversación continua, y `/export` vuelca la conversación entera: las 4.863 primeras líneas de `fase-6-sesion-claude.md` son idénticas a las de `fase-5-sesion-claude.md` (el cierre de la fase 5 ya estaba en esa exportación) y el resto añade la fase 6 hasta el momento de exportarla. Los 519.988 bytes y el SHA-256 de la tabla se calcularon sobre el archivo y coinciden con los del commit `b681fcc`.
+
+Escaneo de las sesiones de las fases 5 y 6 con un script de patrones (claves de Anthropic, tokens de GitHub, cabeceras Bearer, contraseñas, correos y rutas personales): no hay secretos; solo el correo `noreply@anthropic.com` de los trailers (20 veces en la de la fase 5 y 32 en la de la fase 6) y rutas locales con el nombre de usuario del sistema operativo, que se dejan tal cual (decisión del usuario; `docs/review.md`, H8). La sesión de la fase 6 no la exige el enunciado, que pide las de las fases 2, 4 y 5; se incluyó como evidencia adicional.
 
 ---
 
