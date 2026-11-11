@@ -11,12 +11,38 @@ SOURCES = {
     "payments": ["payment_id", "order_id", "paid_at", "method", "status", "amount"],
 }
 # refunds.json is a list of objects; amounts are kept as the text they have in the file.
-REFUND_COLUMNS = ["refund_id", "order_id", "refunded_at", "amount", "currency"]
+# Two formats live together in data/inbox (KIV-102): up to 2026-09-07 the amount is `amount`; from 2026-09-08 it is
+# `refund_amount` and each record also has `reason` (free text or null). The column `amount` of raw_refunds holds
+# the effective amount of each record; `reason` is kept only here, in the raw layer, and never reaches the outputs.
+REFUND_COLUMNS = ["refund_id", "order_id", "refunded_at", "amount", "currency", "reason"]
+REFUND_AMOUNT_FIELDS = ("refund_amount", "amount")  # in order of priority: the new name wins when both are present
 
 
 def _create(conn, table, columns):
     conn.execute(f"DROP TABLE IF EXISTS {table}")
     conn.execute(f"CREATE TABLE {table} ({', '.join(c + ' TEXT' for c in columns)})")
+
+
+def _text(value):
+    return "" if value is None else str(value)
+
+
+def _refund_amount(record):
+    """Effective amount of one refund, decided per record (not per file).
+
+    A field is present when its key exists and its value is neither null nor blank. `refund_amount` wins over
+    `amount`; with none present the amount is empty and metrics.py rejects the refund as `importe no valido`.
+    """
+    for field in REFUND_AMOUNT_FIELDS:
+        value = _text(record.get(field))
+        if value.strip():
+            return value
+    return ""
+
+
+def _refund_row(record, day):
+    values = {"amount": _refund_amount(record)}
+    return [values[c] if c in values else _text(record.get(c)) for c in REFUND_COLUMNS] + [day.name]
 
 
 def _load_refunds(conn, day):
@@ -29,8 +55,7 @@ def _load_refunds(conn, day):
         refunds = json.load(fh, parse_float=str, parse_int=str)
     if not isinstance(refunds, list):
         raise ValueError(f"{path}: se esperaba una lista JSON de devoluciones")
-    rows = [[("" if r.get(c) is None else str(r.get(c))) for c in REFUND_COLUMNS] + [day.name]
-            for r in refunds if isinstance(r, dict)]
+    rows = [_refund_row(r, day) for r in refunds if isinstance(r, dict)]
     placeholders = ", ".join("?" for _ in range(len(REFUND_COLUMNS) + 1))
     conn.executemany(f"INSERT INTO raw_refunds VALUES ({placeholders})", rows)
 
