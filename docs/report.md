@@ -1,7 +1,7 @@
 # Memoria de la práctica · Pipeline Kivora
 
-**Versión:** 1.0, fase 6 (cierre del proyecto), sobre la 0.5 de la fase 4; la sección 5 se añadió en la fase 5. La 0.1 se commiteó en `efe0bcc`, la 0.3 en `f37e4ee`, la 0.4 en `dcc4bbb` y la 0.5 en `b5aa5d2`; la 1.0 se commitea en la fase 6 (ver `git log`).
-**Estado:** documenta el proyecto completo, de la fase 1 a la 6, con las siete secciones del apartado 6 del enunciado. Solo falta cerrar con el tag `phase-6` y el push. Cada cifra remite a una ejecución, a un commit o a un documento del repositorio.
+**Versión:** 1.0, fase 6 (cierre del proyecto), sobre la 0.5 de la fase 4; la sección 5 se añadió en la fase 5. La 0.1 se commiteó en `efe0bcc`, la 0.3 en `f37e4ee`, la 0.4 en `dcc4bbb` y la 0.5 en `b5aa5d2`; la 1.0 se commiteó en la fase 6 (último commit `de07329`, al que apunta el tag `phase-6`).
+**Estado:** documenta el proyecto completo, de la fase 1 a la 6, con las siete secciones del apartado 6 del enunciado. La fase 6 está cerrada: el tag `phase-6` y los commits están publicados en `origin`. Cada cifra remite a una ejecución, a un commit o a un documento del repositorio.
 
 **Historial de referencia (fases 2 a 6):**
 
@@ -36,9 +36,9 @@
 | `d610b9b` | Fase 6: memoria v1.0 (secciones 3, 6 y 7 completas, referencias obsoletas corregidas e historial actualizado) y estado de los hallazgos en `docs/review.md` |
 | `7a09246` | Fase 6: hallazgo H10 (el `amend` de la fase 1) en `docs/review.md` y referencia en las secciones 6 y 7 |
 | `b681fcc` | Fase 6: sesión exportada, `docs/sessions/fase-6-sesion-claude.md` |
-| *(commit de esta actualización, ver `git log`)* | Fase 6: la sesión de la fase 6 en la tabla de sesiones de la sección 3 |
+| `de07329` | Fase 6: la sesión de la fase 6 en la tabla de sesiones de la sección 3 |
 
-**Tags** (de `phase-2` a `phase-5` anotados; `phase-1` es ligero; todos publicados en `origin`): `phase-1` → `4d88adb`, `phase-2` → `ad71b5a`, `phase-3` → `dcc4bbb`, `phase-4` → `20a6816`, `phase-5` → `23628be`. `phase-6` se crea al cerrar la fase.
+**Tags** (de `phase-2` a `phase-6` anotados; `phase-1` es ligero; todos publicados en `origin`): `phase-1` → `4d88adb`, `phase-2` → `ad71b5a`, `phase-3` → `dcc4bbb`, `phase-4` → `20a6816`, `phase-5` → `23628be`, `phase-6` → `de07329` (anotado y publicado en `origin`).
 
 ---
 
